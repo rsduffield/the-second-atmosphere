@@ -344,22 +344,24 @@
   /* ────────────────────────────────────────────────────────────
      YELLOW — Curiosity. Filaments. Constant tiny events.
      ────────────────────────────────────────────────────────────
-     Three high oscillators (base 1400 Hz region). Each carries its
-     own presence envelope — a sum of three mutually-irrational sine
-     waves passed through a threshold gate (computed in JS, applied
-     via setTargetAtTime) — producing irregular pulses of audibility
-     that never repeat within a realistic session.
+     Three mid-register oscillators (roughly 320–880 Hz). Earlier
+     iterations placed these at 1.7–6 kHz, which read as a piercing
+     whistle; they now sit in the same register as the rest of the
+     ecology. Each carries its own presence envelope — a sum of
+     three mutually-irrational sine waves passed through a threshold
+     gate (computed in JS, applied via setTargetAtTime) — producing
+     irregular, slow swells of audibility that never repeat within a
+     realistic session.
 
      The filament technique: whenever an oscillator's envelope drops
      to silence, its frequency is instantly retuned (inaudibly, while
-     silent) to a new, continuously-random ratio of the base
-     frequency before it reappears. This is what makes filaments
-     "appear... at a different pitch... dissolve... reappear
-     elsewhere" rather than simply fading the same tone in and out.
+     silent) before it reappears — "appear... at a different pitch...
+     dissolve... reappear elsewhere". New pitches are drawn from the
+     harmonic series of Blue's 40 Hz fundamental, so filaments emerge
+     as overtones of the foundation rather than unrelated tones; low
+     coherence (fear) detunes them off those harmonics.
 
-     A shared bandpass filter keeps Yellow bright and close —
-     unfiltered high partials read as near and immediate, the
-     opposite spatial character from Blue's distant, filtered mass.
+     A soft shared lowpass keeps Yellow warm rather than glassy.
      ──────────────────────────────────────────────────────────── */
 
   function buildYellowVoice(ctx, dest) {
@@ -367,13 +369,13 @@
     voiceGain.gain.value = 0;
 
     const sharedFilter = ctx.createBiquadFilter();
-    sharedFilter.type = 'bandpass';
-    sharedFilter.frequency.value = 1800;
+    sharedFilter.type = 'lowpass';
+    sharedFilter.frequency.value = 1100;
     sharedFilter.Q.value = 0.5;
     sharedFilter.connect(voiceGain);
     voiceGain.connect(dest);
 
-    const base = 1400;
+    const base = 40; // Blue's fundamental — filaments are its harmonics
     const envPeriods = [
       [47.3, 71.9, 113.7],
       [58.1, 83.3, 131.2],
@@ -383,7 +385,7 @@
     const partials = envPeriods.map((periods, i) => {
       const osc = ctx.createOscillator();
       osc.type = 'sine';
-      osc.frequency.value = base * (1.2 + Math.random() * 1.8);
+      osc.frequency.value = filamentFrequency(base, 0.5, 0.55);
 
       const g = ctx.createGain();
       g.gain.value = 0; // envelope-driven, starts silent
@@ -407,6 +409,16 @@
     });
 
     return { voiceGain, sharedFilter, partials, base };
+  }
+
+  // Pick a filament pitch: a harmonic of `base` between the 8th
+  // (320 Hz) and up to the 22nd (880 Hz) — the upper limit widens
+  // with curiosity — detuned off the harmonic as coherence falls.
+  function filamentFrequency(base, curiosityNorm, coh) {
+    const span = 6 + Math.round(curiosityNorm * 8);
+    const harmonic = 8 + Math.floor(Math.random() * (span + 1));
+    const cents = (Math.random() * 2 - 1) * (1 - coh) * 40;
+    return base * harmonic * Math.pow(2, cents / 1200);
   }
 
 
@@ -651,8 +663,8 @@
     /*    the filament appear/dissolve envelopes are handled in    */
     /*    updateYellowFilaments() below, which reads curiosityNorm */
     const yv = voices.yellow;
-    yv.voiceGain.gain.setTargetAtTime(0.4 + curiosityNorm * 0.6, now, T);
-    yv.sharedFilter.frequency.setTargetAtTime(1500 + curiosityNorm * 900, now, T);
+    yv.voiceGain.gain.setTargetAtTime(0.10 + curiosityNorm * 0.18, now, T);
+    yv.sharedFilter.frequency.setTargetAtTime(900 + curiosityNorm * 500, now, T);
 
     /* ── GREEN (hope) ────────────────────────────────────────── */
     const gv = voices.green;
@@ -722,17 +734,20 @@
       const presence = t * t * (3 - 2 * t);
 
       const targetGain = presence * (0.55 + curiosityNorm * 0.45);
-      p.gain.gain.setTargetAtTime(targetGain, now, 0.9);
+      p.gain.gain.setTargetAtTime(targetGain, now, 2.0); // slow swells, no pings
 
       // Filament retune: if we just crossed from present → silent,
       // pick a new frequency now, inaudibly, before it reappears.
+      // Wait until the envelope has actually decayed (~4 time
+      // constants) so the jump is never heard.
       const isPresent = presence > 0.02;
-      if (!isPresent && p.wasPresent) {
-        const widthBoost = 1.0 + curiosityNorm * 0.8; // wider band, more curious
+      if (!isPresent && p.wasPresent) p.silentSince = tSec;
+      if (!isPresent && p.silentSince != null && tSec - p.silentSince > 8) {
         p.osc.frequency.setValueAtTime(
-          voices.yellow.base * (1.2 + Math.random() * 1.8 * widthBoost),
+          filamentFrequency(voices.yellow.base, curiosityNorm, coherence),
           now
         );
+        p.silentSince = null;
       }
       p.wasPresent = isPresent;
     });
