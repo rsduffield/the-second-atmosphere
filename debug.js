@@ -26,6 +26,16 @@
 
   const SIGNALS = ['attention', 'curiosity', 'fear', 'hope', 'wonder'];
 
+  // Display names: the internal keys predate the GDELT remapping
+  // (see README). The overlay shows what each signal now measures.
+  const LABELS = {
+    attention: 'event volume',
+    curiosity: 'diplomacy',
+    fear:      'conflict',
+    hope:      'aid & trade',
+    wonder:    'stability',
+  };
+
   // Dot colours matching the five chromatic primaries
   const DOT_COLORS = {
     attention: '#ff00cc',  // magenta
@@ -73,7 +83,7 @@
     const isGdelt    = source.startsWith('gdelt');
     const sourceDot  = isGdelt ? '#a8ffb0' : source === 'injected' ? '#ffe888' : '#888899';
     const sourceText = isGdelt
-      ? `gdelt live${articleCount ? ` · ${articleCount} articles` : ''}`
+      ? `gdelt live${articleCount ? ` · ${articleCount} events` : ''}`
       : source;
 
     const modeIsEvent = mode === 'global-event';
@@ -95,7 +105,7 @@
     }
 
     html += `<div class="dbg-divider"></div>`;
-    html += `<div class="dbg-section-label">EMOTIONAL CLIMATE</div>`;
+    html += `<div class="dbg-section-label">WORLD EVENTS</div>`;
 
     for (const key of SIGNALS) {
       const cur   = sig.current[key];
@@ -106,7 +116,7 @@
       html += `
         <div class="dbg-signal-row">
           <span class="dbg-dot" style="background:${dot}"></span>
-          <span class="dbg-signal-name">${key}</span>
+          <span class="dbg-signal-name">${LABELS[key]}</span>
           ${buildBar(cur, fill)}
           <span class="dbg-signal-val">${formatVal(cur)}</span>
           <span class="dbg-signal-tgt">→ ${formatVal(tgt)}</span>

@@ -204,7 +204,7 @@ async function fetchNewSignal() {
     if (adapter) {
       const gdeltSignal = await adapter.fetchSignal();
       if (gdeltSignal) {
-        state.target = gdeltSignal;
+        Object.assign(state.target, gdeltSignal); // mutate in place so planetarySignal.target stays live
         const r = adapter.lastResult;
         state.meta.source       = r.source;
         state.meta.fetchedAt    = r.fetchedAt;
@@ -217,7 +217,7 @@ async function fetchNewSignal() {
     }
 
     // Fall back to simulation
-    state.target              = generateSimulatedSignal();
+    Object.assign(state.target, generateSimulatedSignal());
     state.meta.source         = 'simulated';
     state.meta.fetchedAt      = Date.now();
     state.meta.articleCount   = 0;
@@ -225,7 +225,7 @@ async function fetchNewSignal() {
 
   } catch (err) {
     console.warn('[signal] fetchNewSignal error:', err);
-    state.target              = generateSimulatedSignal();
+    Object.assign(state.target, generateSimulatedSignal());
     state.meta.source         = 'simulated';
     state.meta.fetchedAt      = Date.now();
     state.meta.articleCount   = 0;
