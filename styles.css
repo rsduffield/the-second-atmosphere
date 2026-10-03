@@ -1,0 +1,364 @@
+/* ============================================================
+   THE SECOND ATMOSPHERE — styles.css
+   ─────────────────────────────────────────────────────────────
+   CANONICAL ARTISTIC DIRECTION: see MASTER_BRIEF.md
+   "This is not a website. It is a living artwork."
+
+   Design intent: deep space, cinematic stillness, minimal type.
+   Typography is a whisper. Silence is part of the composition.
+
+   Palette:
+     --void          #000005              absolute space black
+     --star          #ffffff              star / type white
+     --atmo          #4fc3f7              physical atmosphere blue
+     --dim           rgba(255,255,255,.38) subdued type
+     --consciousness #d1daf0              second atmosphere neutral
+                                          (cool pearl — no emotional state)
+
+   Phase III colour slots (to be animated by JS emotional data):
+     --emotion-primary    current emotional tint (default: pearl)
+     --emotion-secondary  accent tint            (default: cool blue)
+
+   Type:
+     Display  — Cormorant Garamond 300 / italic  (elegance, geological slowness)
+     Utility  — Inter 300                         (precision labels, nearly invisible)
+   ============================================================ */
+
+/* ---------- Reset ---------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ---------- Root variables ---------- */
+:root {
+  --void:       #000005;
+  --star:       #ffffff;
+  --dim:        rgba(255, 255, 255, 0.38);
+  --atmo:       #4fc3f7;
+
+  /* Second atmosphere neutral — pearl-white, no emotional state.
+     Phase III: JS will transition these via CSS custom property animation
+     or direct style.setProperty() calls in sync with shader uniforms. */
+  --consciousness:      #d1daf0;
+  --emotion-primary:    #d1daf0;   /* Phase III: overridden per emotional state */
+  --emotion-secondary:  #b3c4e8;   /* Phase III: overridden per emotional state */
+
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-ui:      'Inter', system-ui, sans-serif;
+}
+
+/* ---------- Base ---------- */
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;              /* canvas fills everything */
+  background: var(--void);
+  color: var(--star);
+}
+
+/* ---------- Three.js canvas ---------- */
+#globe-canvas {
+  position: fixed;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+/* ---------- UI overlay layer ---------- */
+/* All text lives here, above the canvas */
+.ui-overlay {
+  position: fixed;
+  z-index: 10;
+  pointer-events: none;          /* let mouse events pass to canvas */
+}
+
+/* ---------- Title block — top-RIGHT (matching reference) ---------- */
+header.ui-overlay {
+  top:        clamp(2rem, 4vw, 3.5rem);
+  right:      clamp(2rem, 4vw, 4rem);
+  left:       auto;
+  max-width:  min(480px, 55vw);
+  text-align: right;
+}
+
+.wordmark {
+  display:        flex;
+  flex-direction: column;
+  gap:            0.4rem;
+  align-items:    flex-end;
+}
+
+/* Main title — large, spaced, light serif */
+.title {
+  font-family:    var(--font-display);
+  font-weight:    300;
+  font-size:      clamp(1.4rem, 3.6vw, 2.9rem);
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  line-height:    1.08;
+  color:          var(--star);
+
+  text-shadow:
+    0 2px 24px rgba(0, 0, 0, 0.90),
+    0 0 80px  rgba(0, 0, 0, 0.60);
+
+  opacity:   0;
+  animation: fadeUp 2.4s cubic-bezier(0.16, 1, 0.3, 1) 0.8s forwards;
+}
+
+/* Subtitle — italic, dimmer */
+.subtitle {
+  font-family:    var(--font-display);
+  font-style:     italic;
+  font-weight:    300;
+  font-size:      clamp(0.72rem, 1.3vw, 0.95rem);
+  letter-spacing: 0.04em;
+  line-height:    1.5;
+  color:          rgba(255, 255, 255, 0.50);
+
+  opacity:   0;
+  animation: fadeUp 2.4s cubic-bezier(0.16, 1, 0.3, 1) 1.4s forwards;
+}
+
+/* ---------- Footer phase label — bottom-left ---------- */
+footer.ui-footer {
+  bottom: clamp(1.8rem, 4vw, 3rem);
+  left:   clamp(2rem, 5vw, 4.5rem);
+}
+
+.phase-label {
+  font-family:    var(--font-ui);
+  font-weight:    300;
+  font-size:      clamp(0.6rem, 1vw, 0.7rem);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color:          var(--dim);
+
+  opacity:   0;
+  animation: fadeUp 2s cubic-bezier(0.16, 1, 0.3, 1) 2.2s forwards;
+}
+
+/* ---------- Keyframes ---------- */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .title, .subtitle, .phase-label { animation: none; opacity: 1; transform: none; }
+}
+
+/* ---------- Mobile ---------- */
+@media (max-width: 480px) and (orientation: portrait) {
+  header.ui-overlay {
+    top: auto; bottom: clamp(7rem, 20vh, 10rem);
+    right: 50%; transform: translateX(50%);
+    text-align: center; max-width: 90vw;
+  }
+  .wordmark { align-items: center; }
+  footer.ui-footer {
+    bottom: clamp(1.5rem, 4vw, 2.5rem);
+    left: 50%; transform: translateX(-50%); text-align: center;
+  }
+}
+
+
+/* ============================================================
+   DEBUG OVERLAY — Planetary Signal readout
+   Redesigned to match the reference image aesthetic.
+   Bottom-right, glass panel, coloured signal dots.
+   Press H to show/hide.
+   ============================================================ */
+
+#debug-overlay {
+  display:        none;
+  position:       fixed;
+  bottom:         clamp(1.5rem, 2.5vw, 2.5rem);
+  right:          clamp(1.5rem, 2.5vw, 2.5rem);
+  z-index:        100;
+  pointer-events: none;
+
+  background:     rgba(0, 0, 6, 0.86);
+  border:         1px solid rgba(255, 255, 255, 0.07);
+  border-radius:  6px;
+  padding:        1.1rem 1.3rem 1.0rem;
+  min-width:      280px;
+
+  font-family:    var(--font-ui);
+  font-size:      0.66rem;
+  font-weight:    300;
+  line-height:    1.65;
+  letter-spacing: 0.05em;
+  color:          rgba(255, 255, 255, 0.50);
+  user-select:    none;
+}
+
+/* Section headers — "PLANETARY SIGNAL" / "EMOTIONAL CLIMATE" */
+.dbg-section-label {
+  font-size:      0.58rem;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  color:          rgba(255, 255, 255, 0.25);
+  margin-bottom:  0.35rem;
+}
+
+/* Source row — dot + "gdelt live · N articles" */
+.dbg-source-row {
+  display:        flex;
+  align-items:    center;
+  gap:            0.45rem;
+  margin-bottom:  0.1rem;
+}
+
+.dbg-dot {
+  width:          7px;
+  height:         7px;
+  border-radius:  50%;
+  flex-shrink:    0;
+  display:        inline-block;
+}
+
+.dbg-source-text {
+  font-size:      0.66rem;
+  color:          rgba(255, 255, 255, 0.65);
+  font-weight:    400;
+}
+
+.dbg-updated {
+  font-size:      0.58rem;
+  color:          rgba(255, 255, 255, 0.22);
+  margin-bottom:  0.5rem;
+  padding-left:   1.1rem;
+}
+
+.dbg-event-label {
+  font-size:      0.62rem;
+  color:          #ffdd44;
+  margin-bottom:  0.5rem;
+  letter-spacing: 0.08em;
+}
+
+.dbg-divider {
+  border-top:     1px solid rgba(255, 255, 255, 0.06);
+  margin:         0.45rem 0;
+}
+
+/* Signal rows */
+.dbg-signal-row {
+  display:        flex;
+  align-items:    center;
+  gap:            0.40rem;
+  margin-bottom:  0.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dbg-signal-name {
+  width:          4.8rem;
+  color:          rgba(255, 255, 255, 0.48);
+  font-size:      0.64rem;
+}
+
+/* Progress bar track + fill */
+.dbg-bar-track {
+  flex:           1;
+  height:         3px;
+  background:     rgba(255, 255, 255, 0.08);
+  border-radius:  2px;
+  overflow:       hidden;
+  min-width:      80px;
+  max-width:      120px;
+}
+
+.dbg-bar-fill {
+  height:         100%;
+  border-radius:  2px;
+  transition:     width 0.6s ease;
+}
+
+.dbg-signal-val {
+  font-size:      0.64rem;
+  color:          rgba(255, 255, 255, 0.70);
+  width:          3.0rem;
+  text-align:     right;
+}
+
+.dbg-signal-tgt {
+  font-size:      0.56rem;
+  color:          rgba(255, 255, 255, 0.22);
+  width:          3.5rem;
+}
+
+.dbg-hint {
+  font-size:      0.56rem;
+  color:          rgba(255, 255, 255, 0.18);
+}
+
+.dbg-warn {
+  font-size:      0.56rem;
+  color:          #aa7733;
+  margin-top:     0.3rem;
+}
+
+
+/* ============================================================
+   AUDIO TOGGLE — Planetary Resonance speaker icon
+   Top-left corner. Self-contained, injected by audio.js.
+   The only interactive element on the page besides the
+   debug-overlay's keyboard shortcut — pointer-events must be
+   enabled here, unlike the passive .ui-overlay text elements.
+   ============================================================ */
+
+#audio-toggle {
+  position:        fixed;
+  top:              clamp(1.6rem, 3vw, 2.6rem);
+  left:             clamp(1.6rem, 3vw, 2.6rem);
+  z-index:          100;
+
+  width:            2.4rem;
+  height:           2.4rem;
+  display:          flex;
+  align-items:      center;
+  justify-content:  center;
+
+  background:       rgba(0, 0, 6, 0.55);
+  border:           1px solid rgba(255, 255, 255, 0.14);
+  border-radius:    50%;
+  color:            rgba(255, 255, 255, 0.55);
+  cursor:           pointer;
+
+  opacity:          0;
+  animation:        fadeUp 2s cubic-bezier(0.16, 1, 0.3, 1) 2.4s forwards;
+
+  transition:       color 0.3s ease,
+                     border-color 0.3s ease,
+                     background 0.3s ease;
+}
+
+#audio-toggle:hover {
+  color:            rgba(255, 255, 255, 0.90);
+  border-color:     rgba(255, 255, 255, 0.30);
+  background:       rgba(0, 0, 6, 0.75);
+}
+
+/* Active state — resonance is currently audible.
+   A very faint cool tint signals "on" without drawing attention. */
+#audio-toggle.audio-active {
+  color:            rgba(180, 210, 255, 0.85);
+  border-color:     rgba(140, 180, 255, 0.35);
+}
+
+#audio-toggle svg {
+  display: block;
+}
+
+@media (max-width: 480px) and (orientation: portrait) {
+  #audio-toggle {
+    top:  clamp(1.2rem, 3vw, 1.8rem);
+    left: clamp(1.2rem, 3vw, 1.8rem);
+  }
+}

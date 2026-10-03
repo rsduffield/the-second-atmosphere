@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A living artwork. The second atmosphere surrounding Earth — composed of attention, emotion, memory and collective consciousness.">
+  <title>The Second Atmosphere</title>
+
+  <!-- Google Fonts: Cormorant Garamond for cinematic display, Inter for utility -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Inter:wght@300;400&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Three.js canvas mounts here via JS -->
+  <canvas id="globe-canvas"></canvas>
+
+  <!-- Title overlay — kept minimal, floats above the planet -->
+  <header class="ui-overlay">
+    <div class="wordmark">
+      <h1 class="title">The Second Atmosphere</h1>
+      <p class="subtitle">Collective human consciousness made visible.</p>
+    </div>
+  </header>
+
+  <!-- Subtle phase label — bottom left -->
+  <footer class="ui-overlay ui-footer">
+    <span class="phase-label">Iteration 25 — The Living Field</span>
+  </footer>
+
+  <!-- Three.js r128 -->
+  <script src="three.min.js"></script>
+  <!-- Core scene -->
+  <script src="main.js"></script>
+  <!-- Planetary Signal pipeline -->
+  <script src="signal.js"></script>
+  <!-- GDELT global event adapter — fetches via the second-atmosphere-gdelt Worker -->
+  <script src="gdelt-adapter.js"></script>
+  <!-- Debug overlay — press H to show/hide -->
+  <script src="debug.js"></script>
+  <!-- Planetary Resonance — injects its own speaker icon, reads window.planetarySignal directly -->
+  <script src="audio.js"></script>
+
+</body>
+</html>
