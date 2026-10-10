@@ -83,6 +83,10 @@ header.ui-overlay {
   left:       auto;
   max-width:  min(480px, 55vw);
   text-align: right;
+
+  /* The whole title block withdraws after 30 seconds,
+     leaving only the field. */
+  animation: fadeAway 3s ease 30s forwards;
 }
 
 .wordmark {
@@ -124,6 +128,34 @@ header.ui-overlay {
   animation: fadeUp 2.4s cubic-bezier(0.16, 1, 0.3, 1) 1.4s forwards;
 }
 
+/* Colour-table instruction — utility type, nearly invisible */
+.hint {
+  font-family:    var(--font-ui);
+  font-weight:    300;
+  font-size:      clamp(0.58rem, 0.9vw, 0.66rem);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color:          var(--dim);
+  margin-top:     0.6rem;
+
+  opacity:   0;
+  animation: fadeUp 2s cubic-bezier(0.16, 1, 0.3, 1) 2.6s forwards;
+}
+
+.hint kbd {
+  font-family:    inherit;
+  font-size:      inherit;
+  padding:        0.05em 0.45em;
+  border:         1px solid rgba(255, 255, 255, 0.25);
+  border-radius:  3px;
+  color:          rgba(255, 255, 255, 0.65);
+}
+
+/* No keyboard on touch-only devices — the instruction would mislead */
+@media (hover: none) and (pointer: coarse) {
+  .hint { display: none; }
+}
+
 /* ---------- Footer phase label — bottom-left ---------- */
 footer.ui-footer {
   bottom: clamp(1.8rem, 4vw, 3rem);
@@ -148,9 +180,15 @@ footer.ui-footer {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes fadeAway {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
-  .title, .subtitle, .phase-label { animation: none; opacity: 1; transform: none; }
+  .title, .subtitle, .hint, .phase-label { animation: none; opacity: 1; transform: none; }
+  header.ui-overlay { animation: fadeAway 0.01s linear 30s forwards; }
 }
 
 /* ---------- Mobile ---------- */
