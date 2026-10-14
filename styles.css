@@ -160,18 +160,35 @@ header.ui-overlay {
 footer.ui-footer {
   bottom: clamp(1.8rem, 4vw, 3rem);
   left:   clamp(2rem, 5vw, 4.5rem);
+  display:        flex;
+  flex-direction: column;
+  gap:            0.55rem;
 }
 
-.phase-label {
-  font-family:    var(--font-ui);
+/* Year — which year's world is shaping the field (years.js).
+   Display serif, small, letter-spaced. The outer span fades in
+   with the page; the inner text cross-fades when the year changes. */
+.year-label {
+  font-family:    var(--font-display);
   font-weight:    300;
-  font-size:      clamp(0.6rem, 1vw, 0.7rem);
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color:          var(--dim);
+  font-size:      clamp(0.95rem, 1.5vw, 1.2rem);
+  letter-spacing: 0.32em;
+  font-variant-numeric: lining-nums;
+  color:          rgba(255, 255, 255, 0.62);
+  min-height:     1.2em;
 
   opacity:   0;
   animation: fadeUp 2s cubic-bezier(0.16, 1, 0.3, 1) 2.2s forwards;
+}
+
+.year-text {
+  display:    inline-block;
+  transition: opacity 0.7s ease, filter 0.7s ease;
+}
+
+.year-text.is-changing {
+  opacity: 0;
+  filter:  blur(3px);
 }
 
 /* ---------- Keyframes ---------- */
@@ -187,7 +204,9 @@ footer.ui-footer {
 
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
-  .title, .subtitle, .hint, .phase-label { animation: none; opacity: 1; transform: none; }
+  .title, .subtitle, .hint, .phase-label, .year-label { animation: none; opacity: 1; transform: none; }
+  .year-text { transition: none; }
+  .year-text.is-changing { filter: none; }
   header.ui-overlay { animation: fadeAway 0.01s linear 30s forwards; }
 }
 
@@ -202,6 +221,7 @@ footer.ui-footer {
   footer.ui-footer {
     bottom: clamp(1.5rem, 4vw, 2.5rem);
     left: 50%; transform: translateX(-50%); text-align: center;
+    align-items: center;
   }
 }
 

@@ -45,6 +45,7 @@ let _cache = {
   articleCount: 0,
   dominant:     'unknown',
   source:       'none',
+  slot:         '',      // export timestamp the live values came from
 };
 
 
@@ -92,6 +93,7 @@ async function fetchSignal() {
     articleCount: data.articleCount || 0,
     dominant:     data.dominant    || 'unknown',
     source:       'gdelt',
+    slot:         (data.raw?.exportFile || '').slice(0, 14),
   };
 
   return _cache.signal;
@@ -102,8 +104,34 @@ async function fetchSignal() {
    PUBLIC API
    ============================================================ */
 
+/* ============================================================
+   fetchYear(slot, year)
+   The same 15-minute moment in an earlier year, from the
+   Worker's /history route. Returns { signal, year, slot } or null.
+   ============================================================ */
+
+async function fetchYear(slot, year) {
+  if (!WORKER_URL || !slot) return null;
+  try {
+    const res = await fetch(`${WORKER_URL}/history?at=${slot}&year=${year}`, {
+      headers: { 'Accept': 'application/json' },
+      signal:  AbortSignal.timeout(15000),
+    });
+    if (!res.ok) throw new Error(`Worker responded ${res.status}`);
+    const data = await res.json();
+    // An older Worker answers every path with live data; only accept
+    // a reply that really is the year asked for.
+    return data?.signal && data.year === year ? data : null;
+  } catch (err) {
+    console.warn(`[gdelt-adapter] ${year} unavailable:`, err.message);
+    return null;
+  }
+}
+
+
 window.gdeltAdapter = {
   fetchSignal,
+  fetchYear,
 
   get lastResult() {
     return {
@@ -112,6 +140,7 @@ window.gdeltAdapter = {
       fetchedAt:    _cache.fetchedAt    || 0,
       articleCount: _cache.articleCount || 0,
       dominant:     _cache.dominant     || 'unknown',
+      slot:         _cache.slot         || '',
     };
   },
 

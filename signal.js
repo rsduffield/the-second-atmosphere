@@ -38,6 +38,10 @@
  *   window.planetarySignal.forceUpdate() — immediate refresh
  *   window.planetarySignal.inject(obj)   — override for testing
  *   window.planetarySignal.triggerEvent(label) — force Global Event
+ *   window.planetarySignal.showYear(values, label) — show an earlier
+ *       year's values in place of the live signal (years.js)
+ *   window.planetarySignal.showLive()  — return to the live signal
+ *   window.planetarySignal.live        — latest live values, always
  */
 
 /* ============================================================
@@ -62,6 +66,13 @@ const state = {
   // Previous target — used for delta detection (Global Event)
   prevTarget: { attention: 50, curiosity: 50, fear: 50, hope: 50, wonder: 50 },
 
+  // Latest LIVE values. The field's target is these, unless an
+  // earlier year is being shown (pastYear set by years.js). Global
+  // Event detection only ever compares live with live, so moving
+  // into or out of a past year never reads as a world event.
+  live:     { attention: 50, curiosity: 50, fear: 50, hope: 50, wonder: 50 },
+  pastYear: null,   // null | { values, label }
+
   meta: {
     source:       'initialising',
     fetchedAt:    0,
@@ -69,6 +80,8 @@ const state = {
     dominant:     'unknown',
     mode:         'background',  // 'background' | 'global-event'
     eventLabel:   '',            // human-readable description of last event
+    slot:         '',            // live GDELT export timestamp, YYYYMMDDHHMMSS
+    liveSource:   'initialising',
   },
 
   lastUpdate: 0,
@@ -195,8 +208,8 @@ async function fetchNewSignal() {
   if (state.fetching) return;
   state.fetching = true;
 
-  // Save previous target for delta detection
-  Object.assign(state.prevTarget, state.target);
+  // Save previous LIVE values for delta detection
+  Object.assign(state.prevTarget, state.live);
 
   try {
     // Try GDELT adapter
@@ -204,35 +217,51 @@ async function fetchNewSignal() {
     if (adapter) {
       const gdeltSignal = await adapter.fetchSignal();
       if (gdeltSignal) {
-        Object.assign(state.target, gdeltSignal); // mutate in place so planetarySignal.target stays live
         const r = adapter.lastResult;
-        state.meta.source       = r.source;
+        state.meta.liveSource   = r.source;
         state.meta.fetchedAt    = r.fetchedAt;
         state.meta.articleCount = r.articleCount;
         state.meta.dominant     = r.dominant;
+        state.meta.slot         = r.slot || '';
+        setLive(gdeltSignal);
         state.fetching = false;
-        checkForGlobalEvent(state.target, state.prevTarget);
+        checkForGlobalEvent(state.live, state.prevTarget);
+        window.dispatchEvent(new CustomEvent('planetary-live', { detail: { slot: state.meta.slot } }));
         return;
       }
     }
 
     // Fall back to simulation
-    Object.assign(state.target, generateSimulatedSignal());
-    state.meta.source         = 'simulated';
+    state.meta.liveSource     = 'simulated';
+    state.meta.slot           = '';
+    setLive(generateSimulatedSignal());
     state.meta.fetchedAt      = Date.now();
     state.meta.articleCount   = 0;
     state.meta.dominant       = 'simulated';
 
   } catch (err) {
     console.warn('[signal] fetchNewSignal error:', err);
-    Object.assign(state.target, generateSimulatedSignal());
-    state.meta.source         = 'simulated';
+    state.meta.liveSource     = 'simulated';
+    state.meta.slot           = '';
+    setLive(generateSimulatedSignal());
     state.meta.fetchedAt      = Date.now();
     state.meta.articleCount   = 0;
     state.meta.dominant       = 'simulated';
   }
 
   state.fetching = false;
+}
+
+
+/* Live values arrive here; they reach the field only when no past
+   year is showing. target is mutated in place so
+   planetarySignal.target stays the same object. */
+function setLive(values) {
+  Object.assign(state.live, values);
+  if (!state.pastYear) {
+    Object.assign(state.target, state.live);
+    state.meta.source = state.meta.liveSource;
+  }
 }
 
 
@@ -369,6 +398,22 @@ window.planetarySignal = {
     state.meta.mode      = 'global-event';
     state.meta.eventLabel = label;
     console.log(`[signal] Manual event: ${label}`);
+  },
+
+  // Earlier years (years.js). The field lerps to them exactly as it
+  // does to a live update; audio follows because it reads current.
+  get live() { return { ...state.live }; },
+
+  showYear(values, label) {
+    state.pastYear = { values: { ...values }, label };
+    Object.assign(state.target, values);
+    state.meta.source = `gdelt ${label}`;
+  },
+
+  showLive() {
+    state.pastYear = null;
+    Object.assign(state.target, state.live);
+    state.meta.source = state.meta.liveSource;
   },
 
   // Read-only event state for debug overlay
