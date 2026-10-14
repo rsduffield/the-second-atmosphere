@@ -68,7 +68,18 @@ const BASELINE = {
    across years reasonably well; raw event volume does not, so
    `events` matters most here. */
 const YEAR_BASELINES = {
-  // 2019: { events: …, verbalCoop: …, materialCoop: …, conflict: …, goldstein: … },
+  // Measured 15 Oct 2026 with /calibrate (8 slots per year; 2020 had 7)
+  2015: { events: 1844, verbalCoop: 0.599, materialCoop: 0.127, conflict: 0.211, goldstein: 0.481 },
+  2016: { events: 1778, verbalCoop: 0.656, materialCoop: 0.101, conflict: 0.187, goldstein: 0.777 },
+  2017: { events: 1600, verbalCoop: 0.571, materialCoop: 0.103, conflict: 0.255, goldstein: -0.108 },
+  2018: { events: 1796, verbalCoop: 0.606, materialCoop: 0.124, conflict: 0.204, goldstein: 0.562 },
+  2019: { events: 1839, verbalCoop: 0.604, materialCoop: 0.118, conflict: 0.210, goldstein: 0.495 },
+  2020: { events: 1457, verbalCoop: 0.636, materialCoop: 0.111, conflict: 0.185, goldstein: 0.813 },
+  2021: { events: 1201, verbalCoop: 0.588, materialCoop: 0.112, conflict: 0.231, goldstein: 0.237 },
+  2022: { events: 962,  verbalCoop: 0.622, materialCoop: 0.119, conflict: 0.193, goldstein: 0.720 },
+  2023: { events: 1214, verbalCoop: 0.601, materialCoop: 0.112, conflict: 0.225, goldstein: 0.196 },
+  2024: { events: 1267, verbalCoop: 0.611, materialCoop: 0.128, conflict: 0.195, goldstein: 0.677 },
+  2025: { events: 1243, verbalCoop: 0.627, materialCoop: 0.120, conflict: 0.191, goldstein: 0.770 },
 };
 
 const ARCHIVE_URL = "http://data.gdeltproject.org/gdeltv2/";
@@ -178,7 +189,7 @@ async function handleHistory(url, ctx) {
   if (slot < ARCHIVE_START) return errorResponse("before the GDELT 2.0 archive begins", 404);
 
   const cache = caches.default;
-  const key = new Request(`https://cache.internal/gdelt-v6-history/${slot}`);
+  const key = new Request(`https://cache.internal/gdelt-v6b-history/${slot}`);
   const hit = await cache.match(key);
   if (hit) return withCacheHeader(new Response(hit.body, hit), "HIT");
 
