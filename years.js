@@ -1,23 +1,25 @@
 /**
  * THE SECOND ATMOSPHERE — years.js
  * ─────────────────────────────────────────────────────────────
- * The field remembers. Within each 15-minute window it leaves the
- * present, passes through the same 15-minute moment in every
- * earlier year back to 2015 (the start of GDELT 2.0's archive),
- * and returns. The year whose data is shaping the field is shown
- * small in the bottom left.
+ * The field remembers. Each 15-minute window opens on the present,
+ * then travels forward through the same moment in every year from
+ * 1979, arriving at last year just as the next live update brings
+ * the present back. The year whose data is shaping the field is
+ * shown small in the bottom left.
  *
- * One window (live data arrives at 0:00):
+ * One window (live data arrives at 0:00), 48 equal steps of ~19 s:
  *
- *   0:00 ── present ──┐ 3:00 ── 2015 · 2016 · … · 2025 ── 14:00 ── present ── 15:00
- *                     └── each year gets an equal share of 11 minutes
+ *   0:00 present (2026) · 1979 · 1980 · … · 2024 · 2025 · 15:00 next present
  *
- * Years are the same month, day and time of day (UTC) as the live
- * export. A year whose archive file can't be read is simply left
- * out of that window.
+ * Two archives:
+ *   1979–2014  the same DAY (UTC date), from GDELT 1.0 — read from
+ *              history/daily/MMDD.json, built by a GitHub Action
+ *   2015 on    the same 15 MINUTES, from GDELT 2.0 — via the
+ *              Worker's /history route
+ * A year whose data is missing is passed over; the year before it
+ * stays a little longer.
  *
- * Add ?years=fast to the URL to preview a compressed window
- * (10 s present, 6 s per year).
+ * Add ?years=fast to the URL to preview: 3 s per step, looping.
  *
  * Reads:  window.gdeltAdapter.fetchYear, window.planetarySignal
  * Listens: 'planetary-live' (dispatched by signal.js)
@@ -28,11 +30,10 @@
 
   const FAST = new URLSearchParams(location.search).get('years') === 'fast';
 
-  const CONFIG = FAST
-    ? { presentOpen: 10, journey: 66, presentClose: 10 }
-    : { presentOpen: 180, journey: 660, presentClose: 60 };   // seconds, total 15 min
+  const WINDOW_SECONDS = FAST ? 48 * 3 : 15 * 60;   // matches signal.js's update interval
 
-  const FIRST_YEAR = 2015;
+  const FIRST_YEAR = 1979;
+  const FIRST_15MIN_YEAR = 2015;                    // GDELT 2.0 begins
   const LABEL_FADE_MS = 1400;
 
 
@@ -95,44 +96,73 @@
     return true;
   }
 
-  /* Load each earlier year one after another (gentle on the Worker;
-     usually edge-cached). They land well within the opening present. */
-  async function loadYears(slot) {
-    for (let y = FIRST_YEAR; y < state.liveYear; y++) {
+  /* 1979–2014: one small file holds this date for every year */
+  async function loadDailyYears(slot) {
+    try {
+      const res = await fetch(`history/daily/${slot.slice(4, 8)}.json`,
+                              { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const days = await res.json();
+      if (slot !== state.slot) return;
+      for (const [year, v] of Object.entries(days)) {
+        const y = parseInt(year, 10);
+        if (y >= FIRST_YEAR && y < FIRST_15MIN_YEAR) {
+          state.years.set(y, { attention: v[0], curiosity: v[1], hope: v[2], fear: v[3], wonder: v[4] });
+        }
+      }
+    } catch (err) {
+      console.warn('[years] daily history unavailable:', err.message);
+    }
+  }
+
+  /* 2015 on: one at a time from the Worker (gentle; usually edge-cached).
+     They aren't needed until about two thirds of the way through. */
+  async function loadRecentYears(slot) {
+    for (let y = FIRST_15MIN_YEAR; y < state.liveYear; y++) {
       if (slot !== state.slot) return;           // a newer window began
       const data = await window.gdeltAdapter?.fetchYear(slot, y);
       if (data && slot === state.slot) state.years.set(y, data.signal);
     }
   }
 
-  /* Every earlier year gets a fixed turn. A year whose data hasn't
-     arrived by its turn (or never will) is passed over, and the year
-     before it simply stays a little longer. */
-  function beginJourney() {
+  /* The present, then every year from 1979 in equal turns, filling the
+     window. A year whose data hasn't arrived by its turn is passed over,
+     and the year before it stays a little longer. */
+  function scheduleJourney() {
     const count = state.liveYear - FIRST_YEAR;
     if (count <= 0) return;
 
-    const each = CONFIG.journey / count;
+    const each = WINDOW_SECONDS / (count + 1);
     for (let i = 0; i < count; i++) {
-      later(i * each, () => showPast(FIRST_YEAR + i));
+      later((i + 1) * each, () => showPast(FIRST_YEAR + i));
     }
-    later(CONFIG.journey, showPresent);
+    // The next live update normally arrives right on time and takes over.
+    // If it's late, return to the present rather than linger in the past;
+    // in preview mode, start the journey again.
+    later(WINDOW_SECONDS + (FAST ? 0 : 45), () => {
+      if (FAST) startWindow(state.slot, true);
+      else showPresent();
+    });
   }
 
 
   /* ── Window ─────────────────────────────────────────────── */
 
-  function startWindow(slot) {
+  function startWindow(slot, keepYears = false) {
     clearTimers();
+    const sameSlot = keepYears && slot === state.slot;
     state.slot = slot || '';
-    state.years = new Map();
+    if (!sameSlot) state.years = new Map();
     if (state.slot) state.liveYear = parseInt(state.slot.slice(0, 4), 10);
 
     showPresent();
     if (!state.slot) return;                      // simulated data: no archive to visit
 
-    loadYears(state.slot);
-    later(CONFIG.presentOpen, beginJourney);
+    if (!sameSlot) {
+      loadDailyYears(state.slot);
+      loadRecentYears(state.slot);
+    }
+    scheduleJourney();
   }
 
   window.addEventListener('planetary-live', (e) => {
@@ -149,7 +179,8 @@
   window.yearMemory = {
     get state() {
       return { slot: state.slot, phase: state.phase, showing: state.showing,
-               loaded: [...state.years.keys()], config: CONFIG };
+               loaded: [...state.years.keys()].sort((a, b) => a - b),
+               stepSeconds: WINDOW_SECONDS / (state.liveYear - FIRST_YEAR + 1) };
     },
     restart() { startWindow(state.slot); },
   };

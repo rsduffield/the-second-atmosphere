@@ -27,19 +27,22 @@ The Worker reads GDELT 2.0's 15-minute global event export and reports five sign
 
 ## Years
 
-Within each 15-minute window the field leaves the present, passes through the same
-15-minute moment (same date and UTC time) in every earlier year back to 2015, and
-returns. The year whose data is shaping the field is shown small in the bottom left.
+Each 15-minute window opens on the present, then travels forward through the same
+moment in every year from 1979, arriving at last year just as the next live update
+brings the present back. The year shaping the field is shown small in the bottom left.
 
-    0:00 present · 3:00 → 2015, 2016 … 2025 (equal shares of 11 min) · 14:00 present
+    0:00 present · 1979 · 1980 · … · 2025 · 15:00 next present   (48 steps of ~19 s)
 
+- **1979–2014:** the same day, from GDELT 1.0. `tools/build_daily_history.py` reads the
+  archive (several GB) and writes `history/daily/MMDD.json`; it runs as the
+  *Build daily history* GitHub Action whenever it changes, or by hand from the Actions tab.
+- **2015 on:** the same 15 minutes, from GDELT 2.0, via the Worker's
+  `/history?at=…&year=…` route (cached 30 days).
+- Every year is measured against its own ordinary (`history/daily/years.json`,
+  `YEAR_BASELINES` in the Worker), because GDELT's coverage has changed so much.
 - `years.js` runs the sequence; `signal.js` keeps live values separate, so moving
   between years never triggers a Global Event.
-- The Worker's `/history?at=…&year=…` route reads that slot from GDELT's archive
-  (cached 30 days; neighbouring slot used if the archive has a gap).
-- `/calibrate?year=…` measures a year's ordinary 15 minutes; paste the result into
-  `YEAR_BASELINES` in the Worker so each year is judged against its own norms.
-- Preview a compressed window with `?years=fast`.
+- Preview with `?years=fast` (3 s per step, looping).
 
 ## Publishing
 

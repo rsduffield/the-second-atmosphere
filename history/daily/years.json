@@ -1,0 +1,290 @@
+{
+ "1979": {
+  "events": 1180.6603,
+  "verbalCoop": 0.6921,
+  "materialCoop": 0.0817,
+  "conflict": 0.1711,
+  "goldstein": 1.0463,
+  "days": 365
+ },
+ "1980": {
+  "events": 1534.0027,
+  "verbalCoop": 0.6514,
+  "materialCoop": 0.086,
+  "conflict": 0.1989,
+  "goldstein": 0.6441,
+  "days": 366
+ },
+ "1981": {
+  "events": 1858.7863,
+  "verbalCoop": 0.6324,
+  "materialCoop": 0.0817,
+  "conflict": 0.2163,
+  "goldstein": 0.3704,
+  "days": 365
+ },
+ "1982": {
+  "events": 2094.0411,
+  "verbalCoop": 0.6246,
+  "materialCoop": 0.0856,
+  "conflict": 0.2214,
+  "goldstein": 0.3379,
+  "days": 365
+ },
+ "1983": {
+  "events": 2325.4959,
+  "verbalCoop": 0.6272,
+  "materialCoop": 0.0844,
+  "conflict": 0.2219,
+  "goldstein": 0.3452,
+  "days": 365
+ },
+ "1984": {
+  "events": 2385.8716,
+  "verbalCoop": 0.6276,
+  "materialCoop": 0.0839,
+  "conflict": 0.224,
+  "goldstein": 0.3214,
+  "days": 366
+ },
+ "1985": {
+  "events": 2706.6904,
+  "verbalCoop": 0.6309,
+  "materialCoop": 0.0863,
+  "conflict": 0.2213,
+  "goldstein": 0.3729,
+  "days": 365
+ },
+ "1986": {
+  "events": 2950.8137,
+  "verbalCoop": 0.6333,
+  "materialCoop": 0.0847,
+  "conflict": 0.2183,
+  "goldstein": 0.3913,
+  "days": 365
+ },
+ "1987": {
+  "events": 2990.6575,
+  "verbalCoop": 0.6412,
+  "materialCoop": 0.0866,
+  "conflict": 0.2107,
+  "goldstein": 0.5151,
+  "days": 365
+ },
+ "1988": {
+  "events": 3232.8415,
+  "verbalCoop": 0.6482,
+  "materialCoop": 0.0904,
+  "conflict": 0.2022,
+  "goldstein": 0.6947,
+  "days": 366
+ },
+ "1989": {
+  "events": 2951.9616,
+  "verbalCoop": 0.6571,
+  "materialCoop": 0.0888,
+  "conflict": 0.1946,
+  "goldstein": 0.7609,
+  "days": 365
+ },
+ "1990": {
+  "events": 3087.5534,
+  "verbalCoop": 0.6544,
+  "materialCoop": 0.0933,
+  "conflict": 0.1902,
+  "goldstein": 0.8297,
+  "days": 365
+ },
+ "1991": {
+  "events": 4030.3726,
+  "verbalCoop": 0.658,
+  "materialCoop": 0.0968,
+  "conflict": 0.1868,
+  "goldstein": 0.9013,
+  "days": 365
+ },
+ "1992": {
+  "events": 2998.1913,
+  "verbalCoop": 0.6733,
+  "materialCoop": 0.093,
+  "conflict": 0.1745,
+  "goldstein": 1.0995,
+  "days": 366
+ },
+ "1993": {
+  "events": 3591.0712,
+  "verbalCoop": 0.6407,
+  "materialCoop": 0.0908,
+  "conflict": 0.2071,
+  "goldstein": 0.6978,
+  "days": 365
+ },
+ "1994": {
+  "events": 4862.0986,
+  "verbalCoop": 0.6473,
+  "materialCoop": 0.0909,
+  "conflict": 0.202,
+  "goldstein": 0.7641,
+  "days": 365
+ },
+ "1995": {
+  "events": 4878.1479,
+  "verbalCoop": 0.6388,
+  "materialCoop": 0.0867,
+  "conflict": 0.2112,
+  "goldstein": 0.6087,
+  "days": 365
+ },
+ "1996": {
+  "events": 7631.7814,
+  "verbalCoop": 0.657,
+  "materialCoop": 0.0865,
+  "conflict": 0.1933,
+  "goldstein": 0.805,
+  "days": 366
+ },
+ "1997": {
+  "events": 10005.7041,
+  "verbalCoop": 0.6957,
+  "materialCoop": 0.0819,
+  "conflict": 0.1642,
+  "goldstein": 1.1317,
+  "days": 365
+ },
+ "1998": {
+  "events": 11692.8,
+  "verbalCoop": 0.6752,
+  "materialCoop": 0.0859,
+  "conflict": 0.1766,
+  "goldstein": 0.924,
+  "days": 365
+ },
+ "1999": {
+  "events": 13025.9918,
+  "verbalCoop": 0.6601,
+  "materialCoop": 0.0862,
+  "conflict": 0.1904,
+  "goldstein": 0.7539,
+  "days": 365
+ },
+ "2000": {
+  "events": 12405.7541,
+  "verbalCoop": 0.6607,
+  "materialCoop": 0.0868,
+  "conflict": 0.1905,
+  "goldstein": 0.7512,
+  "days": 366
+ },
+ "2001": {
+  "events": 13687.5151,
+  "verbalCoop": 0.6497,
+  "materialCoop": 0.086,
+  "conflict": 0.201,
+  "goldstein": 0.6049,
+  "days": 365
+ },
+ "2002": {
+  "events": 12098.4192,
+  "verbalCoop": 0.6401,
+  "materialCoop": 0.0887,
+  "conflict": 0.206,
+  "goldstein": 0.5398,
+  "days": 365
+ },
+ "2003": {
+  "events": 15140.1644,
+  "verbalCoop": 0.6457,
+  "materialCoop": 0.0919,
+  "conflict": 0.1976,
+  "goldstein": 0.6516,
+  "days": 365
+ },
+ "2004": {
+  "events": 12686.4699,
+  "verbalCoop": 0.6262,
+  "materialCoop": 0.0961,
+  "conflict": 0.2135,
+  "goldstein": 0.4573,
+  "days": 366
+ },
+ "2005": {
+  "events": 9684.5863,
+  "verbalCoop": 0.6215,
+  "materialCoop": 0.0969,
+  "conflict": 0.2148,
+  "goldstein": 0.4442,
+  "days": 365
+ },
+ "2006": {
+  "events": 17385.5644,
+  "verbalCoop": 0.6092,
+  "materialCoop": 0.0983,
+  "conflict": 0.2235,
+  "goldstein": 0.3072,
+  "days": 365
+ },
+ "2007": {
+  "events": 30803.0082,
+  "verbalCoop": 0.5989,
+  "materialCoop": 0.1062,
+  "conflict": 0.2276,
+  "goldstein": 0.2619,
+  "days": 365
+ },
+ "2008": {
+  "events": 39155.7951,
+  "verbalCoop": 0.6076,
+  "materialCoop": 0.1117,
+  "conflict": 0.2147,
+  "goldstein": 0.4012,
+  "days": 366
+ },
+ "2009": {
+  "events": 64286.5699,
+  "verbalCoop": 0.6218,
+  "materialCoop": 0.1121,
+  "conflict": 0.2033,
+  "goldstein": 0.5604,
+  "days": 365
+ },
+ "2010": {
+  "events": 61650.1397,
+  "verbalCoop": 0.6156,
+  "materialCoop": 0.115,
+  "conflict": 0.207,
+  "goldstein": 0.5379,
+  "days": 365
+ },
+ "2011": {
+  "events": 86305.6329,
+  "verbalCoop": 0.5979,
+  "materialCoop": 0.1153,
+  "conflict": 0.2207,
+  "goldstein": 0.343,
+  "days": 365
+ },
+ "2012": {
+  "events": 93727.1284,
+  "verbalCoop": 0.6014,
+  "materialCoop": 0.1136,
+  "conflict": 0.219,
+  "goldstein": 0.3497,
+  "days": 366
+ },
+ "2013": {
+  "events": 96335.6658,
+  "verbalCoop": 0.606,
+  "materialCoop": 0.1152,
+  "conflict": 0.2143,
+  "goldstein": 0.4238,
+  "days": 365
+ },
+ "2014": {
+  "events": 133055.5457,
+  "verbalCoop": 0.5984,
+  "materialCoop": 0.1167,
+  "conflict": 0.2208,
+  "goldstein": 0.3545,
+  "days": 361
+ }
+}

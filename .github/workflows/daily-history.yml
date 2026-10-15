@@ -1,0 +1,48 @@
+# Builds history/daily/ — one value per day, 1979–2014, from GDELT 1.0's
+# archive — and commits it back to the branch. Runs when the builder or
+# this workflow changes, or by hand from the Actions tab.
+name: Build daily history
+
+on:
+  push:
+    paths:
+      - tools/build_daily_history.py
+      - .github/workflows/daily-history.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-history-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Read GDELT 1.0 archive and build daily files
+        run: python3 tools/build_daily_history.py
+        env:
+          WORKERS: "4"
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add history/daily
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Daily history 1979–2014 from GDELT 1.0"
+            # The branch may have moved on while the archive was being read
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
