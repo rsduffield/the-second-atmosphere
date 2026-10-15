@@ -1,5 +1,5 @@
 // Deploys worker.js as the second-atmosphere-gdelt Worker.
-// Used by Cloudflare Workers Builds when the Worker is connected to this
+// Used by Cloudflare Workers Builds (connected 15 Oct 2026) with this
 // repo (root directory: worker), so a push to main deploys it.
 {
   "name": "second-atmosphere-gdelt",
