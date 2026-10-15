@@ -1,0 +1,11 @@
+// Deploys worker/worker.js as the second-atmosphere-gdelt Worker.
+// Cloudflare Workers Builds runs `npx wrangler deploy` from the top of
+// this repo on every push to main. (The Pages site ignores this file:
+// it has no pages_build_output_dir.)
+{
+  "name": "second-atmosphere-gdelt",
+  "main": "worker/worker.js",
+  "compatibility_date": "2026-06-27",
+  "workers_dev": true,
+  "observability": { "enabled": true }
+}
