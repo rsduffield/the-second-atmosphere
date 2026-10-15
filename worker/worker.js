@@ -51,16 +51,18 @@ const LAST_GOOD_TTL_SECONDS = 60 * 60 * 24 * 7;
 const GDELT_TIMEOUT_MS = 15000;
 const LASTUPDATE_URL = "http://data.gdeltproject.org/gdeltv2/lastupdate.txt";
 
-/* Typical values for an ordinary 15 minutes (log-mention weighted).
-   These set where "50" sits. They are starting estimates — the
-   payload's `raw` block reports the live values so they can be
-   tuned after watching it for a few days. */
+/* Typical values for an ordinary 15 minutes in the present
+   (log-mention weighted). These set where "50" sits for the live
+   field. Measured with /calibrate?year=2026 on 15 Oct 2026, the same
+   way as each earlier year's YEAR_BASELINES, so the present and the
+   past are judged alike. The payload's `raw` block reports live values
+   if they need re-measuring later. */
 const BASELINE = {
-  events: 1400,          // events in one 15-minute export
-  verbalCoop: 0.52,      // QuadClass 1
-  materialCoop: 0.09,    // QuadClass 2
-  conflict: 0.30,        // QuadClass 4 + 0.5 × QuadClass 3
-  goldstein: 0.6,        // mean Goldstein scale
+  events: 991,           // events in one 15-minute export
+  verbalCoop: 0.617,     // QuadClass 1
+  materialCoop: 0.115,   // QuadClass 2
+  conflict: 0.205,       // QuadClass 4 + 0.5 × QuadClass 3
+  goldstein: 0.592,      // mean Goldstein scale
 };
 
 /* Each year's ordinary 15 minutes, from /calibrate. Until a year is
@@ -105,8 +107,8 @@ export default {
     if (url.pathname === "/calibrate") return handleCalibrate(url, ctx);
 
     const cache = caches.default;
-    const primaryKey = new Request("https://cache.internal/gdelt-v5-primary", request);
-    const lastGoodKey = new Request("https://cache.internal/gdelt-v5-lastgood", request);
+    const primaryKey = new Request("https://cache.internal/gdelt-v6-primary", request);
+    const lastGoodKey = new Request("https://cache.internal/gdelt-v6-lastgood", request);
 
     const primaryHit = await cache.match(primaryKey);
     if (primaryHit) {
