@@ -27,8 +27,9 @@
     </div>
   </header>
 
-  <!-- Subtle phase label — bottom left -->
+  <!-- Bottom left: the year whose data is shaping the field, above the phase label -->
   <footer class="ui-overlay ui-footer">
+    <span class="year-label" aria-live="polite"><span class="year-text" id="year-label"></span></span>
     <span class="phase-label">Iteration 25 — The Living Field</span>
   </footer>
 
@@ -40,6 +41,8 @@
   <script src="signal.js"></script>
   <!-- GDELT global event adapter — fetches via the second-atmosphere-gdelt Worker -->
   <script src="gdelt-adapter.js"></script>
+  <!-- Years — the field passes through the same moment in earlier years -->
+  <script src="years.js"></script>
   <!-- Debug overlay — press H to show/hide -->
   <script src="debug.js"></script>
   <!-- Planetary Resonance — injects its own speaker icon, reads window.planetarySignal directly -->
