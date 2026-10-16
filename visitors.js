@@ -154,7 +154,10 @@
     state.recent = data.recent || [];
     if (newest) state.lastSeenAt = Math.max(state.lastSeenAt, newest.at);
     render();
-    if (isNew && !firstLoad) showWord(newest);
+    if (isNew && !firstLoad) {
+      showWord(newest);
+      window.dispatchEvent(new CustomEvent('visitor-word', { detail: { ...newest } }));
+    }
   }
 
   // add.html in another tab of this browser (preview, local mode)

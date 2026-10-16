@@ -142,6 +142,18 @@
   }
 
 
+  /* Tell anything listening (printer.js) which year is shaping the
+     field, with its values and how thick its record is. */
+  function announce(year, values, phase) {
+    if (!values) return;
+    window.dispatchEvent(new CustomEvent('field-year', { detail: {
+      year, phase, values: { ...values },
+      eventsPerDay: phase === 'future' ? null : (EVENTS_PER_DAY[year] ?? null),
+      slot: state.slot,
+    } }));
+  }
+
+
   /* ── Present ────────────────────────────────────────────── */
 
   function showPresent() {
@@ -151,6 +163,7 @@
     window.planetarySignal?.showLive();
     setLabel(String(state.liveYear));
     setRecord(state.liveYear);
+    announce(state.liveYear, window.planetarySignal?.live, 'present');
   }
 
 
@@ -165,6 +178,7 @@
     window.planetarySignal?.showYear(values, String(year));
     setLabel(String(year));
     setRecord(year);
+    announce(year, values, 'past');
     return true;
   }
 
@@ -247,6 +261,7 @@
     window.setFuture?.(k / FUTURE_YEARS);
     setLabel(`${year} ?`);
     setRecord(year, k === 1 ? 'no record yet — trends carried forward' : 'no record — uncertainty widening');
+    announce(year, values, 'future');
   }
 
   /* The present, then every year from 1979 in equal turns, filling the
