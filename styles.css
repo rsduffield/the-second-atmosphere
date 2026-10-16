@@ -226,15 +226,15 @@ footer.ui-footer {
 /* ---------- Mobile ---------- */
 @media (max-width: 480px) and (orientation: portrait) {
   header.ui-overlay {
-    top: auto; bottom: clamp(7rem, 20vh, 10rem);
+    top: clamp(5rem, 14vw, 6rem); bottom: auto;
     right: 50%; transform: translateX(50%);
-    text-align: center; max-width: 90vw;
+    text-align: center; max-width: 90vw; width: 90vw;
   }
   .wordmark { align-items: center; }
   footer.ui-footer {
     bottom: clamp(1.5rem, 4vw, 2.5rem);
-    left: 50%; transform: translateX(-50%); text-align: center;
-    align-items: center;
+    left: clamp(1.2rem, 3vw, 1.8rem);
+    max-width: 40vw;
   }
 }
 
@@ -242,16 +242,18 @@ footer.ui-footer {
 /* ============================================================
    DEBUG OVERLAY — Planetary Signal readout
    Redesigned to match the reference image aesthetic.
-   Bottom-right, glass panel, coloured signal dots.
+   Top-left under its button, glass panel, coloured signal dots.
    Press H to show/hide.
    ============================================================ */
 
 #debug-overlay {
   display:        none;
   position:       fixed;
-  bottom:         clamp(1.5rem, 2.5vw, 2.5rem);
-  right:          clamp(1.5rem, 2.5vw, 2.5rem);
+  top:            calc(clamp(1.6rem, 3vw, 2.6rem) + 3.4rem);
+  left:           clamp(1.6rem, 3vw, 2.6rem);
   z-index:        100;
+  max-height:     calc(100vh - clamp(1.6rem, 3vw, 2.6rem) - 4.4rem);
+  overflow-y:     auto;
   pointer-events: none;
 
   background:     rgba(0, 0, 6, 0.86);
@@ -524,6 +526,9 @@ footer.ui-footer {
 .visitor-qr svg { display: block; width: 100%; height: auto; }
 .visitor-qr svg path, .visitor-qr svg rect[fill="black"] { fill: #0a0608; }
 .visitor-corner.is-gallery .visitor-link { pointer-events: none; border: 0; }
+.visitor-corner.is-gallery .visitor-count { order: 0; }
+.visitor-corner.is-gallery .visitor-link  { order: 1; }
+.visitor-corner.is-gallery .visitor-qr    { order: 2; margin-top: 0.4rem; }
 
 /* A newly left word surfaces in the field, then sinks */
 .visitor-word {
@@ -551,7 +556,7 @@ footer.ui-footer {
   .visitor-word { transition: opacity 0.6s; filter: none; }
 }
 @media (max-width: 480px) and (orientation: portrait) {
-  .visitor-corner { top: clamp(1.2rem, 3vw, 1.8rem); bottom: auto; right: clamp(1.2rem, 3vw, 1.8rem); max-width: calc(100vw - 9rem); }
+  .visitor-corner { bottom: clamp(1.5rem, 4vw, 2.5rem); right: clamp(1.2rem, 3vw, 1.8rem); max-width: 52vw; }
 }
 
 /* ?speakermap — the speaker ring, for installing and checking (audio.js) */
