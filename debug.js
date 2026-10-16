@@ -1,7 +1,9 @@
 /**
  * THE SECOND ATMOSPHERE — debug.js
  * Debug overlay — press H, or tap the table button beside the
- * speaker icon, to show/hide.
+ * speaker icon, to show/hide. In the gallery (?gallery) there is no
+ * button: visitors see the colour table on their phones instead
+ * (add.html, via the QR code), and H still works for installing.
  * Displays Planetary Signal values and current mode.
  * Redesigned to match the reference UI aesthetic.
  */
@@ -31,7 +33,8 @@
       <line x1="5" y1="12" x2="15" y2="12"/>
       <line x1="5" y1="17" x2="11" y2="17"/>
     </svg>`;
-  document.body.appendChild(btn);
+  const GALLERY = new URLSearchParams(window.SA_PARAMS ?? location.search).has('gallery');
+  if (!GALLERY) document.body.appendChild(btn);
 
   function toggle() {
     visible = !visible;

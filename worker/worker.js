@@ -100,6 +100,7 @@ export default {
     }
     const path = new URL(request.url).pathname;
     if (path === "/archive") return handleArchive(request, env);
+    if (path === "/now") return handleNow(request, env);
     if (request.method !== "GET") {
       return new Response("Method not allowed", { status: 405 });
     }
@@ -538,4 +539,61 @@ function archiveJson(data, status = 200, maxAge = 0) {
       "Cache-Control": maxAge ? `public, max-age=${maxAge}` : "no-store",
     },
   });
+}
+
+
+/* ============================================================
+   WHAT THE GALLERY SCREEN IS SHOWING — /now
+   ============================================================
+   The gallery screen (?gallery) reports the year shaping the field
+   and its five values each time the year changes, and once a minute
+   besides. The phone page (add.html?place=gallery) reads it, so the
+   colour table lives on visitors' phones rather than on the screen.
+
+   POST /now {year, phase, values: {attention, curiosity, fear, hope, wonder}, eventsPerDay}
+   GET  /now  → the same, plus `at` (ms) and `fresh` (reported in the last 2 minutes)
+
+   Kept in D1 (binding VISITORS), one row, table created on first use.
+   ============================================================ */
+
+const NOW_SIGNALS = ["attention", "curiosity", "fear", "hope", "wonder"];
+const NOW_PHASES = ["present", "past", "now", "future"];
+const NOW_FRESH_MS = 2 * 60 * 1000;
+let nowTableReady = false;
+
+async function handleNow(request, env) {
+  const db = env.VISITORS;
+  if (!db) return archiveJson({ error: "not configured" }, 503);
+  if (!nowTableReady) {
+    await db.prepare("CREATE TABLE IF NOT EXISTS screen (id TEXT PRIMARY KEY, at INTEGER NOT NULL, data TEXT NOT NULL)").run();
+    nowTableReady = true;
+  }
+
+  if (request.method === "GET") {
+    const row = await db.prepare("SELECT at, data FROM screen WHERE id = 'gallery'").first();
+    if (!row) return archiveJson({ fresh: false });
+    return archiveJson({ ...JSON.parse(row.data), at: row.at, fresh: Date.now() - row.at < NOW_FRESH_MS });
+  }
+
+  if (request.method !== "POST") return archiveJson({ error: "method not allowed" }, 405);
+
+  let body;
+  try { body = await request.json(); } catch { return archiveJson({ error: "bad request" }, 400); }
+
+  const year = Math.round(Number(body?.year));
+  const phase = NOW_PHASES.includes(body?.phase) ? body.phase : null;
+  if (!Number.isFinite(year) || year < 1979 || year > 2100 || !phase) return archiveJson({ error: "bad year" }, 400);
+
+  const values = {};
+  for (const k of NOW_SIGNALS) {
+    const v = Number(body?.values?.[k]);
+    if (!Number.isFinite(v)) return archiveJson({ error: `bad ${k}` }, 400);
+    values[k] = Math.round(Math.max(0, Math.min(100, v)) * 10) / 10;
+  }
+  const epd = Number(body?.eventsPerDay);
+  const data = { year, phase, values, eventsPerDay: Number.isFinite(epd) && epd > 0 ? Math.round(epd) : null };
+
+  await db.prepare("INSERT INTO screen (id, at, data) VALUES ('gallery', ?, ?) ON CONFLICT(id) DO UPDATE SET at = excluded.at, data = excluded.data")
+    .bind(Date.now(), JSON.stringify(data)).run();
+  return archiveJson({ ok: true });
 }

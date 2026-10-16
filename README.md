@@ -69,6 +69,13 @@ Stored by the Worker's `/archive` route in the D1 database
 `second-atmosphere-visitors`. `?gallery` shows a QR code to `add.html`.
 To hide a word: `UPDATE entries SET hidden = 1 WHERE id = …;`
 
+**The colour table on visitors' phones** (`now.js`, `add.html`). In the
+gallery there is no table button on screen. Instead `now.js` reports the
+year shaping the field and its five values to the Worker's `/now` route
+each time the year changes, and `add.html?place=gallery` (the QR code's
+page) shows them live, with the visitors' word count. H still opens the
+on-screen table for installing.
+
 **The physical trace** (`printer.js`, `printer/`). `?printer` sends a line
 per year, and each visitor word, to a thermal receipt printer. See
 `printer/README.md`.

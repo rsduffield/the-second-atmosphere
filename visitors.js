@@ -96,8 +96,12 @@
     const box = corner.querySelector('.visitor-qr');
     box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
     box.hidden = false;
-    corner.querySelector('.visitor-link').textContent = 'Leave a word for today';
+    corner.querySelector('.visitor-link').textContent = 'Scan to see the colours and leave a word';
     corner.classList.add('is-gallery');
+    // The colour table is on visitors' phones in the gallery, not on screen
+    document.querySelectorAll('header .hint').forEach((h) => {
+      h.textContent = 'Scan the code, bottom right, for the colour table';
+    });
   }
 
   let wordTimer = null;
