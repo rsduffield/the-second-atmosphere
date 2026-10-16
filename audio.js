@@ -32,16 +32,17 @@
  *   GREEN    → hope        (soft filtered air, connects the whole field)
  *   RED      → fear        (latent conflict, destabilises everything)
  *
- * SPATIAL SOUND (Iteration 35, for the gallery). With ?speakers=N
- * (3–16) each voice gets its own place in a ring of N speakers and
+ * SPATIAL SOUND (Iteration 35). Each voice gets its own place in a ring of N speakers and
  * moves around the room by its own logic: Blue fills the room,
  * Magenta wanders, Green's air circles once per breath, Yellow's
  * filaments reappear somewhere new, and Red sits in one place until
  * conflict rises, then surrounds the listener. If the audio device
  * has N outputs they are used directly (output 1 in front, then
- * clockwise round the room). If not — headphones, a laptop — the
- * ring is folded into stereo so the movement can still be heard.
- * Without ?speakers nothing changes. ?speakermap shows the ring.
+ * clockwise round the room). Online, a ring of six is folded into
+ * stereo for everyone, so the movement is heard on headphones and
+ * speakers alike. ?speakers=N (3–16) uses N real outputs in the
+ * gallery; ?speakers=2 restores the fixed stereo sound. ?speakermap
+ * shows the ring.
  */
 
 (function () {
@@ -126,7 +127,12 @@
   const SPATIAL = (() => {
     const q = new URLSearchParams(window.SA_PARAMS ?? location.search);
     const n = parseInt(q.get('speakers') || '', 10);
-    return { requested: Number.isFinite(n) && n >= 3 && n <= 16 ? n : 0, showMap: q.has('speakermap') };
+    const explicit = Number.isFinite(n) && n >= 3 && n <= 16;
+    // Everyone hears the moving ring: online it is six speakers folded
+    // into stereo. ?speakers=N uses N real outputs in the gallery;
+    // ?speakers=2 returns to the earlier fixed stereo sound.
+    if (n === 2) return { requested: 0, explicit: false, showMap: false };
+    return { requested: explicit ? n : 6, explicit, showMap: q.has('speakermap') };
   })();
   let spatial = null;
 
@@ -596,7 +602,8 @@
   };
 
   function buildSpatialBus(ctx, n, out) {
-    const discrete = (ctx.destination.maxChannelCount || 2) >= n;
+    // Real outputs only when the gallery asks for them; online, always fold
+    const discrete = SPATIAL.explicit && (ctx.destination.maxChannelCount || 2) >= n;
     const angles = Array.from({ length: n }, (_, i) => (i / n) * Math.PI * 2);
     const buses = [];
 

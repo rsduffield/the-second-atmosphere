@@ -3,7 +3,7 @@
 A fullscreen generative colour field and sound piece by Robert Sherwood Duffield,
 driven by GDELT's live record of world events.
 
-Live: https://second-atmosphere.pages.dev
+Live: https://second-atmosphere-live.pages.dev (the original upload-only project, https://second-atmosphere.pages.dev, is not built from this repo)
 
 ## Files
 
@@ -46,8 +46,10 @@ brings the present back. The year shaping the field is shown small in the bottom
 
 ## For the exhibition (EMAF 2027)
 
-Everything below is switched on by a URL parameter; without them the
-online piece behaves as before.
+The archive seams, the speculative future, the visitors' archive and the
+spatial sound are part of the piece for everyone. The printer, real
+multichannel outputs, the QR code and the film are switched on by URL
+parameters.
 
 **Archive seams.** Each year's record density — how many events GDELT
 holds for an ordinary day of that year, from about 1,200 in 1979 to about
@@ -71,9 +73,11 @@ To hide a word: `UPDATE entries SET hidden = 1 WHERE id = …;`
 per year, and each visitor word, to a thermal receipt printer. See
 `printer/README.md`.
 
-**Spatial sound.** `?speakers=N` (3–16) gives each voice its own place in
-a ring of N speakers (output 1 in front, then clockwise), folded into
-stereo when the device has fewer outputs. `?speakermap` shows the ring.
+**Spatial sound.** Each voice has its own place in a ring of speakers and
+moves round it. Online the ring is six speakers folded into stereo. In the
+gallery `?speakers=N` (3–16) uses N real outputs (output 1 in front, then
+clockwise). `?speakers=2` restores the earlier fixed stereo sound;
+`?speakermap` shows the ring.
 
 **The film cut** (`film.js`). `?film` records one complete window with
 its sound at 1920 × 1080 (`?film=4k`, `?film=720` for other sizes), with
