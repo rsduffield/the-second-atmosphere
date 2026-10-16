@@ -505,3 +505,14 @@ footer.ui-footer {
 @media (max-width: 480px) and (orientation: portrait) {
   .visitor-corner { top: clamp(1.5rem, 4vw, 2.5rem); bottom: auto; right: 50%; transform: translateX(50%); align-items: center; text-align: center; }
 }
+
+/* ?speakermap — the speaker ring, for installing and checking (audio.js) */
+.speaker-map {
+  position: fixed;
+  top: clamp(4.5rem, 8vw, 6rem);
+  left: clamp(1.2rem, 3vw, 2.4rem);
+  z-index: 20;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 12px;
+}

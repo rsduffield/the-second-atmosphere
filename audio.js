@@ -31,6 +31,17 @@
  *   YELLOW   → curiosity   (fine shimmering filaments, appear/dissolve)
  *   GREEN    → hope        (soft filtered air, connects the whole field)
  *   RED      → fear        (latent conflict, destabilises everything)
+ *
+ * SPATIAL SOUND (Iteration 35, for the gallery). With ?speakers=N
+ * (3–16) each voice gets its own place in a ring of N speakers and
+ * moves around the room by its own logic: Blue fills the room,
+ * Magenta wanders, Green's air circles once per breath, Yellow's
+ * filaments reappear somewhere new, and Red sits in one place until
+ * conflict rises, then surrounds the listener. If the audio device
+ * has N outputs they are used directly (output 1 in front, then
+ * clockwise round the room). If not — headphones, a laptop — the
+ * ring is folded into stereo so the movement can still be heard.
+ * Without ?speakers nothing changes. ?speakermap shows the ring.
  */
 
 (function () {
@@ -110,6 +121,15 @@
   let noiseBuffer = null;
 
 
+  /* Spatial sound: see header. spatial stays null in plain stereo. */
+  const SPATIAL = (() => {
+    const q = new URLSearchParams(location.search);
+    const n = parseInt(q.get('speakers') || '', 10);
+    return { requested: Number.isFinite(n) && n >= 3 && n <= 16 ? n : 0, showMap: q.has('speakermap') };
+  })();
+  let spatial = null;
+
+
   /* ============================================================
      3. NOISE BUFFER — for Green's filtered air
      ────────────────────────────────────────────────────────────
@@ -147,28 +167,41 @@
     masterGain = ctx.createGain();
     masterGain.gain.value = 0;
 
-    const limiter = ctx.createDynamicsCompressor();
-    limiter.threshold.value = -6;
-    limiter.knee.value      = 12;
-    limiter.ratio.value     = 8;
-    limiter.attack.value    = 0.02;
-    limiter.release.value   = 0.4;
-    masterGain.connect(limiter);
-    limiter.connect(ctx.destination);
-
     // Presence gain — attention's role. Subtler than before (0.70–1.15)
     // because in this iteration attention is mostly Blue's own concern;
     // this is just a light overall-presence trim, not a dramatic swing.
     presenceGain = ctx.createGain();
     presenceGain.gain.value = 0.85;
-    presenceGain.connect(masterGain);
+
+    let dests;
+    if (SPATIAL.requested) {
+      // Each voice to its own router; the speakers' buses meet in presenceGain
+      spatial = buildSpatialBus(ctx, SPATIAL.requested, presenceGain);
+      presenceGain.connect(masterGain);
+      masterGain.connect(ctx.destination);
+      dests = {};
+      for (const name of ['blue', 'magenta', 'yellow', 'green', 'red']) {
+        dests[name] = makeRouter(ctx, spatial, name);
+      }
+    } else {
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -6;
+      limiter.knee.value      = 12;
+      limiter.ratio.value     = 8;
+      limiter.attack.value    = 0.02;
+      limiter.release.value   = 0.4;
+      masterGain.connect(limiter);
+      limiter.connect(ctx.destination);
+      presenceGain.connect(masterGain);
+      dests = { blue: presenceGain, magenta: presenceGain, yellow: presenceGain, green: presenceGain, red: presenceGain };
+    }
 
     voices = {
-      blue:    buildBlueVoice(ctx, presenceGain),
-      magenta: buildMagentaVoice(ctx, presenceGain),
-      yellow:  buildYellowVoice(ctx, presenceGain),
-      green:   buildGreenVoice(ctx, presenceGain),
-      red:     buildRedVoice(ctx, presenceGain),
+      blue:    buildBlueVoice(ctx, dests.blue),
+      magenta: buildMagentaVoice(ctx, dests.magenta),
+      yellow:  buildYellowVoice(ctx, dests.yellow),
+      green:   buildGreenVoice(ctx, dests.green),
+      red:     buildRedVoice(ctx, dests.red),
     };
 
     // ── Cross-voice relationships (wired once, at construction) ──
@@ -176,6 +209,7 @@
 
     graphBuilt = true;
     startUpdateLoop();
+    startSpeakerMap();
   }
 
 
@@ -305,6 +339,10 @@
 
     dry.connect(voiceGain);
     chorusDelay.connect(wet).connect(voiceGain);
+    // Oct 2026: this connection was missing, so Magenta was built but
+    // never reached the speakers. Remove this line to return to the
+    // four-voice sound the piece had before.
+    voiceGain.connect(dest);
 
     const configs = [
       { base: 190, glideDepth: 27, glidePeriod: 113, presencePeriods: null },
@@ -528,6 +566,171 @@
 
 
   /* ============================================================
+     4b. SPATIAL SOUND (?speakers=N)
+     ────────────────────────────────────────────────────────────
+     N speakers stand in a ring: speaker 1 in front, then clockwise.
+     Each voice has a router — one gain per speaker — and a place on
+     the ring (theta) with a spread (0 = from one point, 1 = from
+     everywhere). updateSpatial() moves them; the router gains are a
+     smooth equal-power bell around theta, widening with spread.
+
+     Each speaker has its own bus and its own limiter, so a loud
+     moment in one corner doesn't duck the others.
+
+     discrete: the device has N outputs; bus i plays on output i.
+     folded:   it doesn't (headphones, laptop). Each bus is panned to
+               where its speaker would be, left to right, so the
+               motion can still be heard and checked before install.
+     ============================================================ */
+
+  const SPATIAL_VOICES = {
+    //          start angle, spread
+    blue:    { theta: 0.0,  spread: 0.92 },   // the foundation fills the room
+    magenta: { theta: 1.2,  spread: 0.30 },   // wanders round the room
+    yellow:  { theta: 2.6,  spread: 0.18 },   // filaments reappear somewhere new
+    green:   { theta: 4.0,  spread: 0.70 },   // air circling, once per breath
+    red:     { theta: 5.2,  spread: 0.10 },   // one place, until conflict surrounds
+  };
+
+  function buildSpatialBus(ctx, n, out) {
+    const discrete = (ctx.destination.maxChannelCount || 2) >= n;
+    const angles = Array.from({ length: n }, (_, i) => (i / n) * Math.PI * 2);
+    const buses = [];
+
+    let merger = null;
+    if (discrete) {
+      ctx.destination.channelCount = n;
+      ctx.destination.channelCountMode = 'explicit';
+      ctx.destination.channelInterpretation = 'discrete';
+      merger = ctx.createChannelMerger(n);
+      for (const node of [out, masterGain]) {
+        node.channelCount = n;
+        node.channelCountMode = 'explicit';
+        node.channelInterpretation = 'discrete';
+      }
+      merger.connect(out);
+    }
+
+    angles.forEach((angle, i) => {
+      const bus = ctx.createGain();
+      bus.channelCount = 1;
+      bus.channelCountMode = 'explicit';
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -6;
+      limiter.knee.value      = 12;
+      limiter.ratio.value     = 8;
+      limiter.attack.value    = 0.02;
+      limiter.release.value   = 0.4;
+      bus.connect(limiter);
+      if (discrete) {
+        limiter.connect(merger, 0, i);
+      } else {
+        const pan = ctx.createStereoPanner();
+        pan.pan.value = Math.sin(angle) * 0.9;       // right of front is right
+        // Speakers behind are a little further away
+        const back = ctx.createGain();
+        back.gain.value = 0.85 + 0.15 * Math.cos(angle);
+        limiter.connect(back).connect(pan).connect(out);
+      }
+      buses.push(bus);
+    });
+
+    const state = {};
+    for (const [name, v] of Object.entries(SPATIAL_VOICES)) state[name] = { ...v, target: v.theta };
+
+    console.log(`[audio] spatial sound: ${n} speakers, ${discrete ? 'discrete outputs' : 'folded into stereo'}`);
+    return { n, discrete, angles, buses, routers: {}, state };
+  }
+
+  function makeRouter(ctx, sp, name) {
+    const input = ctx.createGain();
+    input.channelCount = 1;                 // stereo voices fold to mono before placing
+    input.channelCountMode = 'explicit';
+    const gains = sp.buses.map((bus) => {
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      input.connect(g).connect(bus);
+      return g;
+    });
+    sp.routers[name] = { input, gains };
+    return input;
+  }
+
+  // Equal-power bell round theta. spread 0 → one speaker; 1 → all alike.
+  function speakerWeights(angles, theta, spread) {
+    const k = 7 * Math.pow(1 - Math.min(1, Math.max(0, spread)), 2);
+    const w = angles.map(a => Math.exp(k * (Math.cos(a - theta) - 1)));
+    const norm = Math.sqrt(w.reduce((acc, x) => acc + x * x, 0)) || 1;
+    return w.map(x => x / norm);
+  }
+
+  const TAU = Math.PI * 2;
+
+  function updateSpatial(dtSec) {
+    if (!spatial) return;
+    const st = spatial.state;
+    const wonderNorm = audioSignal.wonder / 100;
+    const fearNorm   = audioSignal.fear / 100;
+
+    st.blue.theta    += TAU * dtSec / 600;                         // a slow lean, ten minutes round
+    st.magenta.theta += TAU * dtSec / (200 - wonderNorm * 120);    // wonder quickens the wandering
+    st.green.theta   += TAU * dtSec / 31.4;                        // with Green's breath
+    st.red.theta     += TAU * dtSec / 420;
+    st.red.spread     = 0.08 + Math.pow(fearNorm, 2) * 0.92;       // conflict surrounds
+    // Yellow eases toward the place its newest filament appeared
+    let d = ((st.yellow.target - st.yellow.theta + Math.PI) % TAU + TAU) % TAU - Math.PI;
+    st.yellow.theta  += d * Math.min(1, dtSec / 2.5);
+
+    const now = ctx.currentTime;
+    for (const [name, r] of Object.entries(spatial.routers)) {
+      const v = st[name];
+      speakerWeights(spatial.angles, v.theta, v.spread)
+        .forEach((w, i) => r.gains[i].gain.setTargetAtTime(w, now, 0.6));
+    }
+  }
+
+  /* ?speakermap — the ring, the speakers, and where each voice is */
+  function startSpeakerMap() {
+    if (!spatial || !SPATIAL.showMap) return;
+    const size = 168;
+    const c = document.createElement('canvas');
+    c.className = 'speaker-map';
+    c.width = size * 2; c.height = size * 2 + 60;
+    c.style.width = size + "px"; c.style.height = (size + 30) + "px";
+    document.body.appendChild(c);
+    const g = c.getContext('2d');
+    const colours = { blue: '#2a5bff', magenta: '#ff2bd9', yellow: '#fff200', green: '#00eb2e', red: '#ff1a00' };
+    const R = size * 0.78, C = size;
+    (function draw() {
+      requestAnimationFrame(draw);
+      g.clearRect(0, 0, c.width, c.height);
+      g.strokeStyle = 'rgba(255,255,255,0.18)';
+      g.lineWidth = 2;
+      g.beginPath(); g.arc(C, C, R, 0, TAU); g.stroke();
+      g.font = '22px Inter, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      spatial.angles.forEach((a, i) => {
+        const x = C + Math.sin(a) * R, y = C - Math.cos(a) * R;
+        g.fillStyle = 'rgba(255,255,255,0.55)';
+        g.fillRect(x - 7, y - 7, 14, 14);
+        g.fillText(String(i + 1), C + Math.sin(a) * (R + 26), C - Math.cos(a) * (R + 26));
+      });
+      for (const [name, v] of Object.entries(spatial.state)) {
+        const level = voices?.[name]?.voiceGain.gain.value ?? 0;
+        const r = R * (1 - v.spread * 0.85);
+        const x = C + Math.sin(v.theta) * r, y = C - Math.cos(v.theta) * r;
+        g.fillStyle = colours[name];
+        g.globalAlpha = 0.25 + Math.min(1, level * 3) * 0.75;
+        g.beginPath(); g.arc(x, y, 8 + v.spread * 22, 0, TAU); g.fill();
+        g.globalAlpha = 1;
+      }
+      g.fillStyle = 'rgba(255,255,255,0.5)';
+      g.font = "18px Inter, sans-serif";
+      g.fillText(spatial.discrete ? `${spatial.n} outputs` : `${spatial.n} folded to stereo`, C, C + R + 52);
+    })();
+  }
+
+
+  /* ============================================================
      5. CROSS-VOICE THREADS
      Wired once, at construction. These are the concrete
      implementations of "relationships between voices" that go
@@ -613,8 +816,10 @@
 
     paramAccum += dt;
     if (paramAccum >= PARAM_INTERVAL_MS && ctx && graphBuilt) {
+      const elapsedSec = paramAccum / 1000;
       paramAccum = 0;
       applyAudioParams();
+      updateSpatial(elapsedSec);
       updateYellowFilaments();
       updateMagentaPresence();
     }
@@ -748,6 +953,8 @@
           now
         );
         p.silentSince = null;
+        // In the gallery the new filament also appears somewhere new
+        if (spatial) spatial.state.yellow.target = Math.random() * TAU;
       }
       p.wasPresent = isPresent;
     });
@@ -781,6 +988,15 @@
   /* ============================================================
      10. TOGGLE — unchanged from Iteration 31
      ============================================================ */
+
+  window.planetaryAudio = {
+    get spatial() {
+      if (!spatial) return null;
+      return { n: spatial.n, discrete: spatial.discrete,
+               voices: Object.fromEntries(Object.entries(spatial.state).map(([k, v]) =>
+                 [k, { theta: +(v.theta % TAU).toFixed(2), spread: +v.spread.toFixed(2) }])) };
+    },
+  };
 
   function toggleResonance() {
     if (!ctx) return;
