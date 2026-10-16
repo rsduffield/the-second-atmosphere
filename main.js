@@ -50,6 +50,11 @@ const uniforms = {
   // the field loses resolution and drops out where nothing was kept.
   u_density:    { value: 1.0 },
 
+  // The speculative future (years.js), 0–1: how far past the present
+  // the field has run. The archive has no record there, so the field
+  // grows unstable — gaps re-draw faster, colour drains, light stutters.
+  u_future:     { value: 0.0 },
+
   // The visitors' archive (visitors.js) — a sixth light, kept by
   // people rather than machines. strength grows with the number of
   // words left; tone is heavy (0) to light (1); flash marks a new word.
@@ -133,6 +138,7 @@ const fragmentShader = /* glsl */`
   uniform float u_pulse;
   uniform float u_pulseAge;
   uniform float u_density;
+  uniform float u_future;
   uniform float u_visitors;
   uniform float u_visitorTone;
   uniform float u_visitorFlash;
@@ -349,6 +355,11 @@ const fragmentShader = /* glsl */`
     // Warp amplitude — fear increases agitation
     float baseWarp = 0.52 + u_turbulence * 0.60;
 
+    // The speculative future: the field disperses — features spread
+    // and loosen as if the structure can no longer hold
+    p.xy *= 1.0 - u_future * 0.45;
+    p.z  += u_future * sin(u_time * 0.21) * 0.35;
+
 
     /* ════════════════════════════════════════════════════════════
        BLUE — calm, depth, breathing
@@ -502,6 +513,19 @@ const fragmentShader = /* glsl */`
     col *= mix(1.0, 0.035, missing);
     col *= 1.0 - seamLine * 0.55;
 
+    // The speculative future: colour drains toward grey and the light
+    // stutters, more with every year beyond the present
+    if (u_future > 0.001) {
+      float lum = dot(col, vec3(0.299, 0.587, 0.114));
+      col = mix(col, vec3(lum) * vec3(0.92, 0.95, 1.05), u_future * 0.62);
+      float stutter = hash33(vec3(floor(u_time * 7.0), 3.1, 7.7)).x;
+      col *= 1.0 - u_future * 0.42 * step(0.55, stutter) * stutter;
+      // Closing in from the edges: by the last year only a pool of
+      // uncertain light remains at the centre
+      float reach = mix(1.6, 0.42, u_future);
+      col *= 1.0 - smoothstep(reach * 0.45, reach, length(uvFine));
+    }
+
 
     /* ════════════════════════════════════════════════════════════
        THE VISITORS' ARCHIVE — a sixth light
@@ -603,6 +627,7 @@ const consciousnessUniforms = {
 
 let lastTime = null;
 let densityTarget = 1.0;
+let futureTarget = 0.0;
 
 function animate(ts) {
   requestAnimationFrame(animate);
@@ -611,6 +636,7 @@ function animate(ts) {
   lastTime = ts;
   uniforms.u_time.value += dt * 0.001;
   // Archive density eases toward its target over a few seconds
+  uniforms.u_future.value += (futureTarget - uniforms.u_future.value) * Math.min(1, dt * 0.0012);
   uniforms.u_density.value += (densityTarget - uniforms.u_density.value) * Math.min(1, dt * 0.0012);
   if (window.planetarySignal) window.planetarySignal.tick(dt, performance.now());
   renderer.render(scene, camera);
@@ -642,6 +668,11 @@ window.setConsciousnessEmotion = setConsciousnessEmotion;
    fullest record GDELT has kept. immediate=true skips the easing. */
 /* The visitors' archive (visitors.js) */
 window.fieldUniforms = uniforms;
+
+window.setFuture = function (f, immediate = false) {
+  futureTarget = Math.max(0, Math.min(1, f));
+  if (immediate) uniforms.u_future.value = futureTarget;
+};
 
 window.setArchiveDensity = function (d, immediate = false) {
   densityTarget = Math.max(0, Math.min(1, d));

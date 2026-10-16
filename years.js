@@ -9,7 +9,14 @@
  *
  * One window (live data arrives at 0:00), 48 equal steps of ~19 s:
  *
- *   0:00 present (2026) · 1979 · 1980 · … · 2024 · 2025 · 15:00 next present
+ *   0:00 present (2026) · 1979 · … · 2025 · 2026 now · 2027? · … · 2031? · 15:00 next present
+ *
+ * After the archive the field reaches the present again, then runs
+ * on into five years the archive cannot know. Their values are the
+ * last fifteen years' trends carried forward, with uncertainty that
+ * grows with each year, and the field visibly comes apart — melting,
+ * draining of colour, closing in from the edges (u_future in main.js). The labels carry
+ * a question mark. Then the next present arrives and it begins again.
  *
  * Two archives:
  *   1979–2014  the same DAY (UTC date), from GDELT 1.0 — read from
@@ -34,6 +41,9 @@
 
   const FIRST_YEAR = 1979;
   const FIRST_15MIN_YEAR = 2015;                    // GDELT 2.0 begins
+  const FUTURE_YEARS = 5;                           // years past the present
+  const TREND_YEARS = 15;                           // how far back the trends are read
+  const SIGNALS = ['attention', 'curiosity', 'hope', 'fear', 'wonder'];
   const LABEL_FADE_MS = 1400;
 
 
@@ -69,7 +79,17 @@
 
   /* Small line under the year: how thick the record is */
   const recordLabel = document.getElementById('record-label');
-  function setRecord(year) {
+  function setRecord(year, futureText) {
+    if (futureText !== undefined) {
+      // No record to be thin or thick: the field keeps the present's
+      // resolution and comes apart in its own way (u_future in main.js)
+      window.setArchiveDensity?.(densityOf(state.liveYear));
+      if (recordLabel && recordLabel.textContent !== futureText) {
+        recordLabel.classList.add('is-changing');
+        setTimeout(() => { recordLabel.textContent = futureText; recordLabel.classList.remove('is-changing'); }, LABEL_FADE_MS / 2);
+      }
+      return;
+    }
     const latest = Math.max(...Object.keys(EVENTS_PER_DAY).map(Number));
     const e = EVENTS_PER_DAY[year] ?? EVENTS_PER_DAY[latest];
     window.setArchiveDensity?.(densityOf(year));
@@ -107,7 +127,8 @@
     liveYear: new Date().getUTCFullYear(),
     years:   new Map(),   // year → signal values, for the current slot
     timers:  [],
-    phase:   'present',   // 'present' | 'past'
+    phase:   'present',   // 'present' | 'past' | 'now' | 'future'
+    future:  null,        // year → extrapolated values, for this window
     showing: null,        // year currently shaping the field
   };
 
@@ -124,6 +145,7 @@
   /* ── Present ────────────────────────────────────────────── */
 
   function showPresent() {
+    window.setFuture?.(0);
     state.phase = 'present';
     state.showing = state.liveYear;
     window.planetarySignal?.showLive();
@@ -137,6 +159,7 @@
   function showPast(year) {
     const values = state.years.get(year);
     if (!values) return false;
+    window.setFuture?.(0);
     state.phase = 'past';
     state.showing = year;
     window.planetarySignal?.showYear(values, String(year));
@@ -174,6 +197,58 @@
     }
   }
 
+  /* ── Future ─────────────────────────────────────────────── */
+
+  /* Each signal's straight-line trend over the last TREND_YEARS of
+     the archive plus the present, carried forward. Uncertainty widens
+     with each year ahead: by the last future year the value may sit
+     up to ±22 from its trend. Drawn afresh every window, so no two
+     futures are the same. */
+  function makeFuture() {
+    const points = [];
+    for (let y = state.liveYear - TREND_YEARS; y < state.liveYear; y++) {
+      if (state.years.has(y)) points.push([y, state.years.get(y)]);
+    }
+    const live = window.planetarySignal?.live;
+    if (live) points.push([state.liveYear, live]);
+
+    const future = new Map();
+    for (let k = 1; k <= FUTURE_YEARS; k++) {
+      const year = state.liveYear + k;
+      const spread = 4 + 18 * (k / FUTURE_YEARS);
+      const values = {};
+      for (const key of SIGNALS) {
+        let v = 50;
+        if (points.length >= 3) {
+          const n = points.length;
+          const mx = points.reduce((a, p) => a + p[0], 0) / n;
+          const my = points.reduce((a, p) => a + p[1][key], 0) / n;
+          let sxy = 0, sxx = 0;
+          for (const [x, val] of points) { sxy += (x - mx) * (val[key] - my); sxx += (x - mx) ** 2; }
+          const slope = sxx ? sxy / sxx : 0;
+          v = my + slope * (year - mx);
+        } else if (live) {
+          v = live[key];
+        }
+        v += (Math.random() * 2 - 1) * spread;
+        values[key] = Math.max(4, Math.min(96, v));
+      }
+      future.set(year, values);
+    }
+    return future;
+  }
+
+  function showFuture(year, k) {
+    const values = state.future?.get(year);
+    if (!values) return;
+    state.phase = 'future';
+    state.showing = year;
+    window.planetarySignal?.showYear(values, `${year}?`);
+    window.setFuture?.(k / FUTURE_YEARS);
+    setLabel(`${year} ?`);
+    setRecord(year, k === 1 ? 'no record yet — trends carried forward' : 'no record — uncertainty widening');
+  }
+
   /* The present, then every year from 1979 in equal turns, filling the
      window. A year whose data hasn't arrived by its turn is passed over,
      and the year before it stays a little longer. */
@@ -181,9 +256,19 @@
     const count = state.liveYear - FIRST_YEAR;
     if (count <= 0) return;
 
-    const each = WINDOW_SECONDS / (count + 1);
+    const steps = 1 + count + 1 + FUTURE_YEARS;      // present, archive, now, future
+    const each = WINDOW_SECONDS / steps;
     for (let i = 0; i < count; i++) {
       later((i + 1) * each, () => showPast(FIRST_YEAR + i));
+    }
+    // The archive ends; the present again — now with the whole past behind it
+    later((count + 1) * each, () => {
+      showPresent();
+      state.phase = 'now';
+      state.future = makeFuture();
+    });
+    for (let k = 1; k <= FUTURE_YEARS; k++) {
+      later((count + 1 + k) * each, () => showFuture(state.liveYear + k, k));
     }
     // The next live update normally arrives right on time and takes over.
     // If it's late, return to the present rather than linger in the past;
@@ -230,10 +315,13 @@
     get state() {
       return { slot: state.slot, phase: state.phase, showing: state.showing,
                loaded: [...state.years.keys()].sort((a, b) => a - b),
-               stepSeconds: WINDOW_SECONDS / (state.liveYear - FIRST_YEAR + 1) };
+               stepSeconds: WINDOW_SECONDS / (state.liveYear - FIRST_YEAR + 2 + FUTURE_YEARS),
+               future: state.future ? Object.fromEntries(state.future) : null };
     },
     restart() { startWindow(state.slot); },
     density: densityOf,
+    // Preview: jump straight to the k-th future year (1–5)
+    previewFuture(k = 3) { state.future = state.future || makeFuture(); showFuture(state.liveYear + k, k); },
     eventsPerDay: EVENTS_PER_DAY,
   };
 
