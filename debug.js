@@ -1,6 +1,7 @@
 /**
  * THE SECOND ATMOSPHERE — debug.js
- * Debug overlay — press H to show/hide.
+ * Debug overlay — press H, or tap the table button beside the
+ * speaker icon, to show/hide.
  * Displays Planetary Signal values and current mode.
  * Redesigned to match the reference UI aesthetic.
  */
@@ -16,12 +17,36 @@
   let visible = false;
   let rafId   = null;
 
+  // A button beside the speaker icon does what H does, for phones and
+  // tablets (and anyone who'd rather tap or click).
+  const btn = document.createElement('button');
+  btn.id = 'table-toggle';
+  btn.type = 'button';
+  btn.setAttribute('aria-label', 'Show the colour table');
+  btn.setAttribute('aria-pressed', 'false');
+  btn.title = 'Colour table (H)';
+  btn.innerHTML = `
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
+      <line x1="5" y1="7"  x2="19" y2="7"/>
+      <line x1="5" y1="12" x2="15" y2="12"/>
+      <line x1="5" y1="17" x2="11" y2="17"/>
+    </svg>`;
+  document.body.appendChild(btn);
+
+  function toggle() {
+    visible = !visible;
+    overlay.style.display = visible ? 'block' : 'none';
+    btn.classList.toggle('is-active', visible);
+    btn.setAttribute('aria-pressed', String(visible));
+    btn.setAttribute('aria-label', visible ? 'Hide the colour table' : 'Show the colour table');
+    if (visible && !rafId) startRendering();
+  }
+
+  btn.addEventListener('click', toggle);
+
   document.addEventListener('keydown', e => {
-    if (e.key === 'h' || e.key === 'H') {
-      visible = !visible;
-      overlay.style.display = visible ? 'block' : 'none';
-      if (visible && !rafId) startRendering();
-    }
+    if (e.target.closest?.('input, textarea')) return;
+    if (e.key === 'h' || e.key === 'H') toggle();
   });
 
   const SIGNALS = ['attention', 'curiosity', 'fear', 'hope', 'wonder'];
@@ -125,7 +150,7 @@
     }
 
     html += `<div class="dbg-divider"></div>`;
-    html += `<div class="dbg-hint">H · hide &nbsp;|&nbsp; planetarySignal.triggerEvent() · test pulse</div>`;
+    html += `<div class="dbg-hint">H or the table button · hide</div>`;
 
     if (window.gdeltAdapter && !window.gdeltAdapter.configured) {
       html += `<div class="dbg-warn">GDELT not configured — set WORKER_URL in gdelt-adapter.js</div>`;
