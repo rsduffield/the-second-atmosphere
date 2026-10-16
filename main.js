@@ -19,8 +19,20 @@
 
 const canvas = document.getElementById('globe-canvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-renderer.setSize(window.innerWidth, window.innerHeight);
+
+// Film mode (film.js): a fixed frame, whatever the window.
+// ?film = 1920 × 1080 · ?film=4k = 3840 × 2160 · ?film=720 = 1280 × 720 · ?film=test = 640 × 360
+const FILM_PARAM = new URLSearchParams(location.search).get('film');
+const FILM = FILM_PARAM !== null;
+const [FILM_W, FILM_H] = ({ '4k': [3840, 2160], '2160': [3840, 2160], '720': [1280, 720], 'test': [640, 360] })[FILM_PARAM] || [1920, 1080];
+window.FILM_SIZE = FILM ? { w: FILM_W, h: FILM_H } : null;
+if (FILM) {
+  renderer.setPixelRatio(1);
+  renderer.setSize(FILM_W, FILM_H, false);
+} else {
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
 
 const scene  = new THREE.Scene();
 const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -32,7 +44,7 @@ const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
 const uniforms = {
   u_time:       { value: 0.0 },
-  u_resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+  u_resolution: { value: FILM ? new THREE.Vector2(FILM_W, FILM_H) : new THREE.Vector2(window.innerWidth, window.innerHeight) },
 
   u_intensity:  { value: 1.0 },
   u_turbulence: { value: 0.0 },
@@ -640,11 +652,13 @@ function animate(ts) {
   uniforms.u_density.value += (densityTarget - uniforms.u_density.value) * Math.min(1, dt * 0.0012);
   if (window.planetarySignal) window.planetarySignal.tick(dt, performance.now());
   renderer.render(scene, camera);
+  if (window.onFieldFrame) window.onFieldFrame(canvas);   // film.js composites each frame
 }
 
 requestAnimationFrame(animate);
 
 window.addEventListener('resize', () => {
+  if (FILM) return;
   renderer.setSize(window.innerWidth, window.innerHeight);
   uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
 });

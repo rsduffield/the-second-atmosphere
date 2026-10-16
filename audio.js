@@ -63,6 +63,7 @@
   let presenceGain   = null;  // signal-driven overall presence (was "attentionGain")
   let isOn           = false;
   let graphStartTime = null;  // performance.now() at graph build — clock for JS-side envelopes
+  let outputNode     = null;  // the last node before the speakers — film.js records from here
 
 
   /* ============================================================
@@ -179,6 +180,7 @@
       spatial = buildSpatialBus(ctx, SPATIAL.requested, presenceGain);
       presenceGain.connect(masterGain);
       masterGain.connect(ctx.destination);
+      outputNode = masterGain;
       dests = {};
       for (const name of ['blue', 'magenta', 'yellow', 'green', 'red']) {
         dests[name] = makeRouter(ctx, spatial, name);
@@ -192,6 +194,7 @@
       limiter.release.value   = 0.4;
       masterGain.connect(limiter);
       limiter.connect(ctx.destination);
+      outputNode = limiter;
       presenceGain.connect(masterGain);
       dests = { blue: presenceGain, magenta: presenceGain, yellow: presenceGain, green: presenceGain, red: presenceGain };
     }
@@ -990,6 +993,19 @@
      ============================================================ */
 
   window.planetaryAudio = {
+    // Start the sound (needs a click or key press first, as browsers require)
+    start() {
+      if (!ctx) buildAudioGraph();
+      if (!isOn) toggleResonance();
+      else if (ctx.state === 'suspended') ctx.resume();
+    },
+    // A MediaStream of exactly what the speakers hear, for recording (film.js)
+    tap() {
+      if (!ctx) buildAudioGraph();
+      const dest = ctx.createMediaStreamDestination();
+      outputNode.connect(dest);
+      return dest.stream;
+    },
     get spatial() {
       if (!spatial) return null;
       return { n: spatial.n, discrete: spatial.discrete,

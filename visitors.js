@@ -31,6 +31,10 @@
   const PARAMS = new URLSearchParams(location.search);
   const GALLERY = PARAMS.has('gallery');
 
+  // The film is the machines' archive alone; the visitors' archive
+  // belongs to the room.
+  if (PARAMS.has('film')) return;
+
   const POLL_MS = 20 * 1000;
   const FULL_AT = 1500;              // words for full strength
   const WORD_SHOW_MS = 9000;

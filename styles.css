@@ -516,3 +516,51 @@ footer.ui-footer {
   background: rgba(0, 0, 0, 0.45);
   border-radius: 12px;
 }
+
+/* ---------- Film mode (?film, film.js) ---------- */
+/* The page shows the composited 1920 × 1080 frame — exactly what is recorded */
+body.film-mode header.ui-overlay,
+body.film-mode footer.ui-footer,
+body.film-mode #audio-toggle,
+body.film-mode .speaker-map { visibility: hidden; }
+body.film-mode #globe-canvas { opacity: 0; }
+.film-frame {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  z-index: 1;
+}
+body.film-running { cursor: none; }
+
+.film-panel {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 30;
+  width: min(30rem, calc(100vw - 2rem));
+  padding: 2rem 2.2rem;
+  background: rgba(5, 3, 8, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.86);
+  font-family: var(--font-ui);
+  font-weight: 300;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  display: flex; flex-direction: column; gap: 0.8rem;
+  transition: opacity 0.6s;
+}
+.film-panel h2 { font-family: var(--font-display); font-weight: 300; font-size: 1.9rem; letter-spacing: 0.12em; text-transform: uppercase; }
+.film-panel .film-note, .film-panel .film-length { color: rgba(255, 255, 255, 0.5); font-size: 0.8rem; }
+.film-actions { display: flex; flex-wrap: wrap; gap: 0.7rem; margin-top: 0.6rem; }
+.film-panel button {
+  background: transparent; color: inherit; border: 1px solid rgba(255, 255, 255, 0.28);
+  font: inherit; font-size: 0.72rem; letter-spacing: 0.22em; text-transform: uppercase;
+  padding: 0.8rem 1.2rem; cursor: pointer;
+}
+.film-panel button:hover, .film-panel button:focus-visible { border-color: #fff; outline: none; }
+.film-panel.is-busy button { opacity: 0.35; pointer-events: none; }
+.film-panel.is-hidden { opacity: 0; pointer-events: none; }
+.film-status { font-family: var(--font-display); font-style: italic; font-size: 1.05rem; color: rgba(255, 236, 210, 0.85); min-height: 1.4em; }
