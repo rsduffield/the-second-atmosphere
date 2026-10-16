@@ -431,3 +431,77 @@ footer.ui-footer {
     left: clamp(1.2rem, 3vw, 1.8rem);
   }
 }
+
+/* ---------- The visitors' archive (visitors.js) ---------- */
+
+/* Bottom right: count, link (web) or QR code (?gallery) */
+.visitor-corner {
+  bottom: clamp(1.8rem, 4vw, 3rem);
+  right:  clamp(2rem, 5vw, 4.5rem);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  text-align: right;
+  opacity: 0;
+  animation: fadeUp 2.4s cubic-bezier(0.16, 1, 0.3, 1) 3s forwards;
+}
+.visitor-link {
+  pointer-events: auto;
+  font-family:    var(--font-ui);
+  font-weight:    300;
+  font-size:      clamp(0.58rem, 0.9vw, 0.66rem);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color:          rgba(255, 236, 210, 0.55);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 236, 210, 0.18);
+  padding-bottom: 0.15rem;
+  transition: color 0.4s, border-color 0.4s;
+}
+.visitor-link:hover, .visitor-link:focus-visible { color: rgba(255, 236, 210, 0.9); border-color: rgba(255, 236, 210, 0.6); outline: none; }
+.visitor-count {
+  font-family:    var(--font-display);
+  font-style:     italic;
+  font-weight:    300;
+  font-size:      clamp(0.72rem, 1.05vw, 0.86rem);
+  letter-spacing: 0.06em;
+  color:          rgba(255, 236, 210, 0.42);
+}
+.visitor-qr {
+  width: clamp(84px, 8vw, 128px);
+  padding: 8px;
+  background: rgba(255, 240, 220, 0.88);
+}
+.visitor-qr svg { display: block; width: 100%; height: auto; }
+.visitor-qr svg path, .visitor-qr svg rect[fill="black"] { fill: #0a0608; }
+.visitor-corner.is-gallery .visitor-link { pointer-events: none; border: 0; }
+
+/* A newly left word surfaces in the field, then sinks */
+.visitor-word {
+  position: fixed;
+  left: var(--x, 50%);
+  top:  var(--y, 50%);
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(1.6rem, 4vw, 3.4rem);
+  letter-spacing: 0.06em;
+  color: rgba(255, 238, 214, 0.92);
+  text-shadow: 0 0 40px rgba(255, 220, 170, 0.55), 0 0 2px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  filter: blur(6px);
+  transition: opacity 3s ease, filter 3s ease;
+}
+.visitor-word.is-showing { opacity: 0.9; filter: blur(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .visitor-corner { animation: none; opacity: 1; }
+  .visitor-word { transition: opacity 0.6s; filter: none; }
+}
+@media (max-width: 480px) and (orientation: portrait) {
+  .visitor-corner { top: clamp(1.5rem, 4vw, 2.5rem); bottom: auto; right: 50%; transform: translateX(50%); align-items: center; text-align: center; }
+}

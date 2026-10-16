@@ -50,6 +50,14 @@ const uniforms = {
   // the field loses resolution and drops out where nothing was kept.
   u_density:    { value: 1.0 },
 
+  // The visitors' archive (visitors.js) — a sixth light, kept by
+  // people rather than machines. strength grows with the number of
+  // words left; tone is heavy (0) to light (1); flash marks a new word.
+  u_visitors:     { value: 0.0 },
+  u_visitorTone:  { value: 0.5 },
+  u_visitorFlash: { value: 0.0 },
+  u_human:   { value: new THREE.Color(1.00, 0.90, 0.76) },   // warm lamplight, outside the five primaries
+
   // Pure saturated digital primaries — purity nudged for Iteration 32
   // colour grade. Hue is preserved exactly; only channel purity
   // increased slightly (5–15%) toward each colour's radiant character.
@@ -125,6 +133,10 @@ const fragmentShader = /* glsl */`
   uniform float u_pulse;
   uniform float u_pulseAge;
   uniform float u_density;
+  uniform float u_visitors;
+  uniform float u_visitorTone;
+  uniform float u_visitorFlash;
+  uniform vec3  u_human;
 
   uniform vec3  u_blue;
   uniform vec3  u_magenta;
@@ -291,6 +303,7 @@ const fragmentShader = /* glsl */`
 
     float aspect = u_resolution.x / u_resolution.y;
     vec2  uv     = (vUv - 0.5) * vec2(aspect, 1.0);
+    vec2  uvFine = uv;          // unquantised: the visitors' archive has no seams
 
 
     /* ════════════════════════════════════════════════════════════
@@ -490,6 +503,29 @@ const fragmentShader = /* glsl */`
     col *= 1.0 - seamLine * 0.55;
 
 
+    /* ════════════════════════════════════════════════════════════
+       THE VISITORS' ARCHIVE — a sixth light
+       Words left by people in the room and online. Warm lamplight,
+       deliberately outside the five digital primaries, drawn AFTER
+       the archive seams so it is never broken by them: where the
+       machines' record is missing, the visitors' light still runs.
+       Strength grows with the number of words; tone (heavy → light)
+       sets how bright and how airy it is; a new word flares it.
+       ════════════════════════════════════════════════════════════ */
+
+    if (u_visitors > 0.001) {
+      float tone   = u_visitorTone;
+      vec3  pH     = vec3(uvFine * 0.88, u_time * 0.0072) + vec3(3.33, 9.12, 2.07);
+      vec2  cfH    = chromaticField(pH, u_time * mix(0.18, 0.40, tone),
+                                    mix(0.70, 0.95, tone), mix(1.25, 1.85, tone), 0.42);
+      float fH     = compositeFilament(cfH);
+      fH = pow(fH, mix(1.9, 1.2, tone));                    // light days: wider, softer threads
+      float lightH = fH * u_visitors * mix(0.55, 1.0, tone) * (1.0 + u_visitorFlash * 1.4);
+      vec3  heavy  = vec3(0.92, 0.62, 0.40);                // heavy days lean to ember
+      col += mix(heavy, u_human, tone) * lightH * 0.85;
+    }
+
+
     /* Global Event shockwave ring removed (Oct 2026) at the artist's
        request. Global Events still register in the colour field
        (u_pulse amplifies red) and in the audio, but no ring is drawn. */
@@ -604,6 +640,9 @@ window.setConsciousnessEmotion = setConsciousnessEmotion;
 
 /* Archive density (years.js): 0 = almost nothing recorded, 1 = the
    fullest record GDELT has kept. immediate=true skips the easing. */
+/* The visitors' archive (visitors.js) */
+window.fieldUniforms = uniforms;
+
 window.setArchiveDensity = function (d, immediate = false) {
   densityTarget = Math.max(0, Math.min(1, d));
   if (immediate) uniforms.u_density.value = densityTarget;

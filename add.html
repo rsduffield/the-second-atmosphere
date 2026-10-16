@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Leave one word for today in the visitors' archive of The Second Atmosphere.">
+  <title>Leave a Word — The Second Atmosphere</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Inter:wght@300;400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #f4ead9;
+      --muted: rgba(244, 234, 217, 0.55);
+      --faint: rgba(244, 234, 217, 0.18);
+      --lamp: #ffe6c2;
+      --ember: #eb9e66;
+      --bg: #050308;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); }
+    body {
+      font-family: 'Inter', system-ui, sans-serif; font-weight: 300;
+      min-height: 100svh; display: grid; place-items: center; padding: 2rem 1.25rem;
+      background: radial-gradient(120% 80% at 50% 110%, rgba(255, 214, 160, 0.14), transparent 60%), var(--bg);
+    }
+    main { width: min(26rem, 100%); display: flex; flex-direction: column; gap: 2.2rem; }
+    h1 {
+      font-family: 'Cormorant Garamond', serif; font-weight: 300; font-size: 2.1rem;
+      letter-spacing: 0.04em; margin: 0; line-height: 1.15;
+    }
+    p { margin: 0; color: var(--muted); font-size: 0.92rem; line-height: 1.6; }
+    label { display: block; font-size: 0.72rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.7rem; }
+    input[type=text] {
+      width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--faint);
+      color: var(--ink); font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 300;
+      padding: 0.3rem 0 0.5rem; outline: none; border-radius: 0;
+    }
+    input[type=text]:focus { border-bottom-color: var(--lamp); }
+    .tone-ends { display: flex; justify-content: space-between; font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.05rem; color: var(--muted); margin-top: 0.4rem; }
+    input[type=range] { width: 100%; accent-color: var(--lamp); height: 2rem; }
+    button {
+      align-self: flex-start; background: transparent; color: var(--ink); border: 1px solid var(--faint);
+      font: inherit; font-size: 0.8rem; letter-spacing: 0.24em; text-transform: uppercase;
+      padding: 0.95rem 1.6rem; cursor: pointer; transition: border-color 0.3s, background 0.3s;
+    }
+    button:hover:not(:disabled), button:focus-visible { border-color: var(--lamp); background: rgba(255, 230, 194, 0.06); outline: none; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    .status { min-height: 1.6em; font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.15rem; color: var(--lamp); }
+    .status.is-error { color: var(--ember); }
+    .note { font-size: 0.75rem; color: rgba(244, 234, 217, 0.38); }
+    @media (prefers-reduced-motion: no-preference) {
+      main { animation: rise 1.2s ease both; }
+      @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>One word<br>for today</h1>
+    </header>
+    <p>The Second Atmosphere reads the world through an archive kept by machines. This is a second archive, kept by people. Your word joins it, and becomes part of the light.</p>
+
+    <form id="form" autocomplete="off">
+      <div>
+        <label for="word">Your word</label>
+        <input type="text" id="word" name="word" maxlength="24" required
+               autocapitalize="none" spellcheck="false" enterkeyhint="done" aria-describedby="word-hint">
+      </div>
+      <div style="margin-top:2rem">
+        <label for="tone">Today feels</label>
+        <input type="range" id="tone" name="tone" min="0" max="100" value="50" aria-valuetext="neither heavy nor light">
+        <div class="tone-ends" aria-hidden="true"><span>heavy</span><span>light</span></div>
+      </div>
+      <div style="margin-top:2.2rem; display:flex; flex-direction:column; gap:1rem">
+        <button type="submit" id="send">Leave it</button>
+        <div class="status" id="status" role="status"></div>
+      </div>
+    </form>
+
+    <p class="note" id="word-hint">One word, letters only. Words are shown in the work and kept for the length of the exhibition. No name or address is stored.</p>
+  </main>
+
+  <script src="gdelt-adapter.js"></script>
+  <script>
+    (function () {
+      const API = WORKER_URL ? `${WORKER_URL}/archive` : null;
+      const PLACE = new URLSearchParams(location.search).get('place') === 'gallery' ? 'gallery' : 'web';
+      const LOCAL_KEY = 'second-atmosphere:visitor-words';
+      const PATTERN = /^[\p{L}][\p{L}\p{M}'’-]{0,23}$/u;
+
+      const form = document.getElementById('form');
+      const wordIn = document.getElementById('word');
+      const toneIn = document.getElementById('tone');
+      const send = document.getElementById('send');
+      const status = document.getElementById('status');
+
+      toneIn.addEventListener('input', () => {
+        const v = +toneIn.value;
+        toneIn.setAttribute('aria-valuetext', v < 35 ? 'heavy' : v > 65 ? 'light' : 'neither heavy nor light');
+      });
+
+      function say(text, error = false) {
+        status.textContent = text;
+        status.classList.toggle('is-error', error);
+      }
+
+      function keepLocally(word, tone) {
+        try {
+          const list = JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]');
+          list.push({ word, tone, at: Date.now(), place: PLACE });
+          localStorage.setItem(LOCAL_KEY, JSON.stringify(list.slice(-500)));
+          return true;
+        } catch { return false; }
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const word = wordIn.value.trim();
+        const tone = +toneIn.value;
+        if (!PATTERN.test(word)) { say('One word, letters only.', true); return; }
+        send.disabled = true;
+        say('');
+        try {
+          let ok = false, message = '';
+          if (API) {
+            try {
+              const res = await fetch(API, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ word, tone, place: PLACE }),
+                signal: AbortSignal.timeout(10000),
+              });
+              if (res.status === 201) ok = true;
+              else if (res.status === 404 || res.status === 405 || res.status === 503) ok = keepLocally(word, tone);
+              else message = (await res.json().catch(() => ({}))).error || 'Something went wrong.';
+            } catch { ok = keepLocally(word, tone); }
+          } else {
+            ok = keepLocally(word, tone);
+          }
+          if (ok) {
+            say('Thank you. It is in the archive now.');
+            wordIn.value = '';
+          } else {
+            say(message ? message.charAt(0).toUpperCase() + message.slice(1) + '.' : 'Something went wrong.', true);
+          }
+        } finally {
+          setTimeout(() => { send.disabled = false; }, 1500);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

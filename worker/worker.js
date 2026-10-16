@@ -98,6 +98,8 @@ export default {
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders(), status: 204 });
     }
+    const path = new URL(request.url).pathname;
+    if (path === "/archive") return handleArchive(request, env);
     if (request.method !== "GET") {
       return new Response("Method not allowed", { status: 405 });
     }
@@ -447,7 +449,93 @@ function withCacheHeader(response, value) {
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
+}
+
+
+/* ============================================================
+   THE VISITORS' ARCHIVE — /archive
+   ============================================================
+   A second archive, kept by people rather than read by machines.
+   A visitor leaves one word for today and says whether the day
+   feels heavy or light (tone 0–100). Entries accumulate in D1
+   (binding VISITORS, database second-atmosphere-visitors) and
+   become the field's sixth signal.
+
+   GET  /archive              → { count, tone, recent: [{word, tone, at, place}] }
+   POST /archive {word, tone, place}
+
+   One entry per visitor per 20 seconds. Words are one word,
+   letters only, up to 24 characters. Anything on BLOCKED is kept
+   but hidden (hidden = 1), so the record stays whole while the
+   screen stays clean. To hide an entry by hand:
+     UPDATE entries SET hidden = 1 WHERE id = …;
+   ============================================================ */
+
+const ARCHIVE_MIN_GAP_MS = 20 * 1000;
+const WORD_PATTERN = /^[\p{L}][\p{L}\p{M}'’-]{0,23}$/u;
+// Extend as needed; matched against the lower-cased word, whole or as a stem.
+const BLOCKED = ["fuck", "shit", "cunt", "bitch", "nazi", "hitler", "rape", "porn", "fick", "scheiss", "scheiß", "hure", "wichser", "fotze"];
+
+async function handleArchive(request, env) {
+  const db = env.VISITORS;
+  if (!db) return archiveJson({ error: "archive not configured" }, 503);
+
+  if (request.method === "GET") {
+    const [countRow, toneRow, recent] = await Promise.all([
+      db.prepare("SELECT COUNT(*) AS n FROM entries").first(),
+      db.prepare("SELECT AVG(tone) AS t FROM (SELECT tone FROM entries ORDER BY id DESC LIMIT 60)").first(),
+      db.prepare("SELECT word, tone, at, place FROM entries WHERE hidden = 0 ORDER BY id DESC LIMIT 24").all(),
+    ]);
+    return archiveJson({
+      count:  countRow?.n || 0,
+      tone:   toneRow?.t == null ? 50 : Math.round(toneRow.t),
+      recent: recent.results || [],
+    }, 200, 10);
+  }
+
+  if (request.method !== "POST") return archiveJson({ error: "method not allowed" }, 405);
+
+  let body;
+  try { body = await request.json(); } catch { return archiveJson({ error: "bad request" }, 400); }
+
+  const word = String(body?.word || "").trim().normalize("NFC");
+  const tone = Math.round(Number(body?.tone));
+  const place = body?.place === "gallery" ? "gallery" : "web";
+  if (!WORD_PATTERN.test(word)) return archiveJson({ error: "one word, letters only" }, 400);
+  if (!Number.isFinite(tone) || tone < 0 || tone > 100) return archiveJson({ error: "tone 0–100" }, 400);
+
+  const who = await visitorHash(request);
+  const now = Date.now();
+  const last = await db.prepare("SELECT at FROM entries WHERE who = ? ORDER BY at DESC LIMIT 1").bind(who).first();
+  if (last && now - last.at < ARCHIVE_MIN_GAP_MS) return archiveJson({ error: "a moment, please" }, 429);
+
+  const lower = word.toLowerCase();
+  const hidden = BLOCKED.some(b => lower.includes(b)) ? 1 : 0;
+  await db.prepare("INSERT INTO entries (at, word, tone, place, who, hidden) VALUES (?, ?, ?, ?, ?, ?)")
+    .bind(now, word, tone, place, who, hidden).run();
+  const n = await db.prepare("SELECT COUNT(*) AS n FROM entries").first();
+  return archiveJson({ ok: true, count: n?.n || 0, word: hidden ? null : word }, 201);
+}
+
+/* A daily-salted hash of the visitor's address: enough to slow
+   repeat posting, without keeping the address itself. */
+async function visitorHash(request) {
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const day = new Date().toISOString().slice(0, 10);
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${day}|${ip}|second-atmosphere`));
+  return [...new Uint8Array(buf)].slice(0, 12).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function archiveJson(data, status = 200, maxAge = 0) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      ...corsHeaders(),
+      "Content-Type": "application/json",
+      "Cache-Control": maxAge ? `public, max-age=${maxAge}` : "no-store",
+    },
+  });
 }

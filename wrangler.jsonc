@@ -7,5 +7,10 @@
   "main": "worker/worker.js",
   "compatibility_date": "2026-06-27",
   "workers_dev": true,
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  // The visitors' archive (/archive): the counter-archive visitors write to
+  "d1_databases": [
+    { "binding": "VISITORS", "database_name": "second-atmosphere-visitors",
+      "database_id": "d900a0c5-8b7a-4074-bc6c-15881e8652c3" }
+  ]
 }
