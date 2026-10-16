@@ -37,6 +37,53 @@
   const LABEL_FADE_MS = 1400;
 
 
+  /* ── Archive density ──────────────────────────────────────
+     How many events GDELT recorded on an ordinary day of each year.
+     1979–2014 from GDELT 1.0 (history/daily/years.json, per day);
+     2015 on from GDELT 2.0 (the Worker's YEAR_BASELINES and BASELINE,
+     per 15 minutes × 96). The two archives count a little differently,
+     so these are orders of magnitude, not exact comparisons.
+
+     The record grows a hundredfold between 1979 and 2015, then thins
+     again as GDELT's sources fall away. Density is placed on a log
+     scale between DENSITY_FLOOR and DENSITY_FULL events a day, and
+     drives the archive seams in main.js. */
+
+  const EVENTS_PER_DAY = {
+    1979: 1181, 1980: 1534, 1981: 1859, 1982: 2094, 1983: 2325, 1984: 2386,
+    1985: 2707, 1986: 2951, 1987: 2991, 1988: 3233, 1989: 2952, 1990: 3088,
+    1991: 4030, 1992: 2998, 1993: 3591, 1994: 4862, 1995: 4878, 1996: 7632,
+    1997: 10006, 1998: 11693, 1999: 13026, 2000: 12406, 2001: 13688, 2002: 12098,
+    2003: 15140, 2004: 12686, 2005: 9685, 2006: 17386, 2007: 30803, 2008: 39156,
+    2009: 64287, 2010: 61650, 2011: 86306, 2012: 93727, 2013: 96336, 2014: 133056,
+    2015: 177024, 2016: 170688, 2017: 153600, 2018: 172416, 2019: 176544, 2020: 139872,
+    2021: 115296, 2022: 92352, 2023: 116544, 2024: 121632, 2025: 119328, 2026: 95136,
+  };
+  const DENSITY_FLOOR = 800;
+  const DENSITY_FULL  = 180000;
+
+  function densityOf(year) {
+    const e = EVENTS_PER_DAY[year] ?? EVENTS_PER_DAY[Math.max(...Object.keys(EVENTS_PER_DAY).map(Number))];
+    return Math.max(0, Math.min(1, Math.log(e / DENSITY_FLOOR) / Math.log(DENSITY_FULL / DENSITY_FLOOR)));
+  }
+
+  /* Small line under the year: how thick the record is */
+  const recordLabel = document.getElementById('record-label');
+  function setRecord(year) {
+    const latest = Math.max(...Object.keys(EVENTS_PER_DAY).map(Number));
+    const e = EVENTS_PER_DAY[year] ?? EVENTS_PER_DAY[latest];
+    window.setArchiveDensity?.(densityOf(year));
+    if (!recordLabel) return;
+    const text = e ? `${e.toLocaleString('en-AU')} events recorded a day` : '';
+    if (recordLabel.textContent === text) return;
+    recordLabel.classList.add('is-changing');
+    setTimeout(() => {
+      recordLabel.textContent = text;
+      recordLabel.classList.remove('is-changing');
+    }, LABEL_FADE_MS / 2);
+  }
+
+
   /* ── Year label (bottom left, above the phase label) ─────── */
 
   const label = document.getElementById('year-label');
@@ -81,6 +128,7 @@
     state.showing = state.liveYear;
     window.planetarySignal?.showLive();
     setLabel(String(state.liveYear));
+    setRecord(state.liveYear);
   }
 
 
@@ -93,6 +141,7 @@
     state.showing = year;
     window.planetarySignal?.showYear(values, String(year));
     setLabel(String(year));
+    setRecord(year);
     return true;
   }
 
@@ -172,6 +221,7 @@
   });
 
   setLabel(String(state.liveYear));
+  setRecord(state.liveYear);
 
 
   /* ── Public ─────────────────────────────────────────────── */
@@ -183,6 +233,8 @@
                stepSeconds: WINDOW_SECONDS / (state.liveYear - FIRST_YEAR + 1) };
     },
     restart() { startWindow(state.slot); },
+    density: densityOf,
+    eventsPerDay: EVENTS_PER_DAY,
   };
 
 })();

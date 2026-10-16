@@ -45,6 +45,11 @@ const uniforms = {
   u_pulse:      { value: 0.0 },
   u_pulseAge:   { value: 0.0 },
 
+  // Archive density, 0–1: how thickly GDELT recorded the year now
+  // shaping the field (years.js). Low density = a thin record, and
+  // the field loses resolution and drops out where nothing was kept.
+  u_density:    { value: 1.0 },
+
   // Pure saturated digital primaries — purity nudged for Iteration 32
   // colour grade. Hue is preserved exactly; only channel purity
   // increased slightly (5–15%) toward each colour's radiant character.
@@ -119,6 +124,7 @@ const fragmentShader = /* glsl */`
   uniform float u_hope;
   uniform float u_pulse;
   uniform float u_pulseAge;
+  uniform float u_density;
 
   uniform vec3  u_blue;
   uniform vec3  u_magenta;
@@ -285,6 +291,38 @@ const fragmentShader = /* glsl */`
 
     float aspect = u_resolution.x / u_resolution.y;
     vec2  uv     = (vUv - 0.5) * vec2(aspect, 1.0);
+
+
+    /* ════════════════════════════════════════════════════════════
+       ARCHIVE SEAMS
+       The record is not even. In 1979 GDELT holds about a thousand
+       events a day, drawn from a handful of wire services; by 2015
+       it holds well over a hundred thousand. Where the record is
+       thin the field is sampled on a coarse grid of cells, so it
+       loses resolution, and some cells hold nothing at all — dark
+       gaps that shift every couple of seconds. As the archive
+       thickens the cells shrink and fill until the field is whole.
+       ════════════════════════════════════════════════════════════ */
+
+    float sparse   = 1.0 - clamp(u_density, 0.0, 1.0);
+    float cellsY   = mix(180.0, 11.0, pow(sparse, 0.75));   // cells down the screen
+    vec2  cellPos  = (vUv - 0.5) * vec2(aspect, 1.0) * cellsY;
+    vec2  cell     = floor(cellPos);
+    vec2  uvCell   = (cell + 0.5) / cellsY;
+    float coarse   = smoothstep(0.10, 0.55, sparse);
+    uv = mix(uv, uvCell, coarse);
+
+    // Missing records: a share of cells holds nothing. Which cells
+    // changes in steps, so the gaps flicker rather than crawl.
+    float dropShare = 0.58 * pow(smoothstep(0.15, 1.0, sparse), 2.0);
+    float step_     = floor(u_time * 0.55);
+    float hCell     = hash33(vec3(cell, step_)).x;
+    float missing   = hCell < dropShare ? 1.0 : 0.0;
+    // A thin dark seam between cells once the grid is coarse
+    vec2  inCell    = fract(cellPos);
+    float seamLine  = coarse * coarse * (1.0 - smoothstep(0.0, 0.06, min(min(inCell.x, inCell.y),
+                                                              min(1.0 - inCell.x, 1.0 - inCell.y))));
+
     float dist   = length(uv);
 
     // Global field rotation (wonder → polarity)
@@ -447,6 +485,10 @@ const fragmentShader = /* glsl */`
        Felt rather than seen. Keeps focus in the field, not corners. */
     col *= 1.0 - smoothstep(0.42, 0.82, length(vUv - 0.5)) * 0.28;
 
+    // Archive seams (see above): empty cells and the lines between them
+    col *= mix(1.0, 0.035, missing);
+    col *= 1.0 - seamLine * 0.55;
+
 
     /* Global Event shockwave ring removed (Oct 2026) at the artist's
        request. Global Events still register in the colour field
@@ -524,6 +566,7 @@ const consciousnessUniforms = {
    ============================================================ */
 
 let lastTime = null;
+let densityTarget = 1.0;
 
 function animate(ts) {
   requestAnimationFrame(animate);
@@ -531,6 +574,8 @@ function animate(ts) {
   const dt = Math.min(ts - lastTime, 50);
   lastTime = ts;
   uniforms.u_time.value += dt * 0.001;
+  // Archive density eases toward its target over a few seconds
+  uniforms.u_density.value += (densityTarget - uniforms.u_density.value) * Math.min(1, dt * 0.0012);
   if (window.planetarySignal) window.planetarySignal.tick(dt, performance.now());
   renderer.render(scene, camera);
 }
@@ -556,4 +601,11 @@ function setConsciousnessEmotion(opts = {}) {
 }
 
 window.setConsciousnessEmotion = setConsciousnessEmotion;
+
+/* Archive density (years.js): 0 = almost nothing recorded, 1 = the
+   fullest record GDELT has kept. immediate=true skips the easing. */
+window.setArchiveDensity = function (d, immediate = false) {
+  densityTarget = Math.max(0, Math.min(1, d));
+  if (immediate) uniforms.u_density.value = densityTarget;
+};
 window.consciousnessUniforms   = consciousnessUniforms;
