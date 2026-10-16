@@ -22,7 +22,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: fals
 
 // Film mode (film.js): a fixed frame, whatever the window.
 // ?film = 1920 × 1080 · ?film=4k = 3840 × 2160 · ?film=720 = 1280 × 720 · ?film=test = 640 × 360
-const FILM_PARAM = new URLSearchParams(location.search).get('film');
+const FILM_PARAM = new URLSearchParams(window.SA_PARAMS ?? location.search).get('film');
 const FILM = FILM_PARAM !== null;
 const [FILM_W, FILM_H] = ({ '4k': [3840, 2160], '2160': [3840, 2160], '720': [1280, 720], 'test': [640, 360] })[FILM_PARAM] || [1920, 1080];
 window.FILM_SIZE = FILM ? { w: FILM_W, h: FILM_H } : null;

@@ -23,7 +23,7 @@
 
 (function () {
 
-  const param = new URLSearchParams(location.search).get('printer');
+  const param = new URLSearchParams(window.SA_PARAMS ?? location.search).get('printer');
   if (param === null) return;
 
   const SERVER = (param && /^https?:\/\//.test(param) ? param : 'http://localhost:8787').replace(/\/$/, '');

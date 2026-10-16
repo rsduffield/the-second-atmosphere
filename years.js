@@ -35,7 +35,7 @@
 
 (function () {
 
-  const FAST = new URLSearchParams(location.search).get('years') === 'fast';
+  const FAST = new URLSearchParams(window.SA_PARAMS ?? location.search).get('years') === 'fast';
 
   const WINDOW_SECONDS = FAST ? 48 * 3 : 15 * 60;   // matches signal.js's update interval
 
@@ -335,6 +335,19 @@
     },
     restart() { startWindow(state.slot); },
     density: densityOf,
+    // Show one year and hold it (the journey stops until play()).
+    // Past years need their data loaded; future years are extrapolated.
+    show(year) {
+      clearTimers();
+      if (year === state.liveYear) { showPresent(); return true; }
+      if (year < state.liveYear) return showPast(year);
+      const k = year - state.liveYear;
+      if (k > FUTURE_YEARS) return false;
+      state.future = state.future || makeFuture();
+      showFuture(year, k);
+      return true;
+    },
+    play() { startWindow(state.slot, true); },
     // Preview: jump straight to the k-th future year (1–5)
     previewFuture(k = 3) { state.future = state.future || makeFuture(); showFuture(state.liveYear + k, k); },
     eventsPerDay: EVENTS_PER_DAY,

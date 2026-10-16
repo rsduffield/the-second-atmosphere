@@ -28,7 +28,7 @@
 (function () {
 
   const API = (typeof WORKER_URL === 'string' && WORKER_URL) ? `${WORKER_URL}/archive` : null;
-  const PARAMS = new URLSearchParams(location.search);
+  const PARAMS = new URLSearchParams(window.SA_PARAMS ?? location.search);
   const GALLERY = PARAMS.has('gallery');
 
   // The film is the machines' archive alone; the visitors' archive

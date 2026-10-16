@@ -124,7 +124,7 @@
 
   /* Spatial sound: see header. spatial stays null in plain stereo. */
   const SPATIAL = (() => {
-    const q = new URLSearchParams(location.search);
+    const q = new URLSearchParams(window.SA_PARAMS ?? location.search);
     const n = parseInt(q.get('speakers') || '', 10);
     return { requested: Number.isFinite(n) && n >= 3 && n <= 16 ? n : 0, showMap: q.has('speakermap') };
   })();

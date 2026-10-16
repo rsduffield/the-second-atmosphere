@@ -25,7 +25,7 @@
 
 (function () {
 
-  const PARAMS = new URLSearchParams(location.search);
+  const PARAMS = new URLSearchParams(window.SA_PARAMS ?? location.search);
   if (!PARAMS.has('film')) return;
 
   const W = window.FILM_SIZE?.w || 1920, H = window.FILM_SIZE?.h || 1080;
