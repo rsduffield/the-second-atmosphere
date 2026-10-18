@@ -7,6 +7,9 @@
  * Film section.
  *
  * Open the page with ?film (add &years=fast for a 2½-minute test).
+ * ?film&gallery records the gallery version: the QR code, its caption
+ * and the visitors' count at the lower right, and any word a visitor
+ * leaves during the recording surfacing in the field.
  * The frame is fixed at 1920 × 1080; ?film=4k records 3840 × 2160,
  * ?film=720 records 1280 × 720. Press Begin: the sound starts,
  * the live data is refreshed so the journey runs uninterrupted, and
@@ -34,6 +37,8 @@
   const TITLE_SECONDS = 9;
   const END_SECONDS = 10;
   const FIRST_YEAR = 1979, FUTURE_YEARS = 5;
+  const GALLERY = PARAMS.has('gallery');
+  const WORD_MS = 9000;
 
   document.body.classList.add('film-mode');
 
@@ -75,6 +80,62 @@
 
   function smooth(t) { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); }
 
+  /* ── Gallery: the visitors' corner and words, drawn into the frame ── */
+
+  let qr = null;
+  if (GALLERY && window.qrcode) {
+    qr = window.qrcode(0, 'M');
+    qr.addData(new URL('add.html?place=gallery', location.href).href);
+    qr.make();
+  }
+  let word = null;   // { text, at, x, y }
+  window.addEventListener('visitor-word', (e) => {
+    if (!GALLERY || !e.detail?.word) return;
+    word = { text: e.detail.word, at: performance.now(), x: 0.18 + Math.random() * 0.64, y: 0.22 + Math.random() * 0.52 };
+  });
+
+  function drawGallery(alpha) {
+    if (!GALLERY || alpha <= 0.01) return;
+    const right = W - 112 * S, size = 168 * S, pad = 10 * S;
+    const qy = 1010 * S - size;
+    g.textAlign = 'right';
+    g.shadowColor = 'rgba(0,0,0,0.7)';
+    g.shadowBlur = 18 * S;
+    const count = window.visitorArchive?.state?.count || 0;
+    g.globalAlpha = alpha * 0.5;
+    g.fillStyle = 'rgb(255,236,210)';
+    g.font = serif(26, true);
+    spaced(count ? `The visitors\u2019 archive \u00b7 ${count.toLocaleString('en-AU')} ${count === 1 ? 'word' : 'words'}` : 'The visitors\u2019 archive is empty', right, qy - 64 * S, 1.5);
+    g.globalAlpha = alpha * 0.62;
+    g.font = `300 ${17 * S}px Inter, system-ui, sans-serif`;
+    spaced('SCAN TO SEE THE COLOURS AND LEAVE A WORD', right, qy - 26 * S, 3);
+    g.shadowBlur = 0;
+    if (qr) {
+      g.globalAlpha = alpha * 0.9;
+      g.fillStyle = 'rgb(255,240,220)';
+      g.fillRect(right - size, qy, size, size);
+      const n = qr.getModuleCount(), cell = (size - 2 * pad) / n;
+      g.fillStyle = '#0a0608';
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+        if (qr.isDark(r, c)) g.fillRect(right - size + pad + c * cell, qy + pad + r * cell, Math.ceil(cell), Math.ceil(cell));
+      }
+    }
+    // A word just left surfaces in the field, then sinks
+    if (word) {
+      const age = performance.now() - word.at;
+      if (age > WORD_MS + 3000) { word = null; return; }
+      const a = smooth(age / 3000) * (1 - smooth((age - WORD_MS) / 3000));
+      g.textAlign = 'center';
+      g.globalAlpha = a * 0.9;
+      g.fillStyle = 'rgb(255,238,214)';
+      g.shadowColor = 'rgba(255,220,170,0.55)';
+      g.shadowBlur = 40 * S;
+      g.font = serif(64, true);
+      spaced(word.text, word.x * W, word.y * H, 4);
+      g.shadowBlur = 0;
+    }
+  }
+
   function drawFrame(glCanvas) {
     g.globalAlpha = 1;
     g.drawImage(glCanvas, 0, 0, W, H);
@@ -100,6 +161,8 @@
       g.font = serif(24, true);
       spaced(recordEl.textContent, 112 * S, 1004 * S, 2);
     }
+
+    drawGallery(live ? smooth((t - TITLE_SECONDS + 2) / 2) : 1);
 
     // Opening title over the first seconds of the present
     if (live && t < TITLE_SECONDS) {
@@ -153,7 +216,7 @@
   const panel = document.createElement('div');
   panel.className = 'film-panel';
   panel.innerHTML = `
-    <h2>The film</h2>
+    <h2>The film${GALLERY ? ' — gallery version' : ''}</h2>
     <p>Records one complete window — the present, every year from ${FIRST_YEAR}, the present again,
        and five years that have not happened — at ${W} × ${H}, with its sound.</p>
     <p class="film-length"></p>
@@ -241,7 +304,7 @@
     const stamp = `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}-${String(d.getUTCHours()).padStart(2, '0')}${String(d.getUTCMinutes()).padStart(2, '0')}`;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `the-second-atmosphere_${stamp}.${ext}`;
+    a.download = `the-second-atmosphere${GALLERY ? '_gallery' : ''}_${stamp}.${ext}`;
     document.body.appendChild(a);
     a.click();
     finish(`Saved ${a.download} (${(blob.size / 1e6).toFixed(0)} MB).`);

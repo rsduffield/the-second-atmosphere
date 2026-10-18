@@ -576,7 +576,9 @@ body.film-mode header.ui-overlay,
 body.film-mode footer.ui-footer,
 body.film-mode #audio-toggle,
 body.film-mode #table-toggle,
-body.film-mode .speaker-map { visibility: hidden; }
+body.film-mode .speaker-map,
+body.film-mode .visitor-corner,
+body.film-mode .visitor-word { visibility: hidden; }   /* drawn into the film instead (?film&gallery) */
 body.film-mode #globe-canvas { opacity: 0; }
 .film-frame {
   position: fixed;

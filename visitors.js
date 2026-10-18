@@ -32,8 +32,9 @@
   const GALLERY = PARAMS.has('gallery');
 
   // The film is the machines' archive alone; the visitors' archive
-  // belongs to the room.
-  if (PARAMS.has('film')) return;
+  // belongs to the room. ?film&gallery records the room's version,
+  // with the visitors' corner and words drawn into the film (film.js).
+  if (PARAMS.has('film') && !GALLERY) return;
 
   const POLL_MS = 20 * 1000;
   const FULL_AT = 1500;              // words for full strength

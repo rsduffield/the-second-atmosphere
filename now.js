@@ -13,7 +13,7 @@
 (function () {
 
   const PARAMS = new URLSearchParams(window.SA_PARAMS ?? location.search);
-  if (!PARAMS.has('gallery') || PARAMS.has('film')) return;
+  if (!PARAMS.has('gallery')) return;
   if (typeof WORKER_URL !== 'string' || !WORKER_URL) return;
 
   const API = `${WORKER_URL}/now`;
