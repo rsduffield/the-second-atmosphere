@@ -64,7 +64,7 @@ const uniforms = {
 
   // The speculative future (years.js), 0–1: how far past the present
   // the field has run. The archive has no record there, so the field
-  // grows unstable — gaps re-draw faster, colour drains, light stutters.
+  // grows unstable — it disperses, colour drains, the light wavers.
   u_future:     { value: 0.0 },
 
   // The visitors' archive (visitors.js) — a sixth light, kept by
@@ -526,12 +526,18 @@ const fragmentShader = /* glsl */`
     col *= 1.0 - seamLine * 0.55;
 
     // The speculative future: colour drains toward grey and the light
-    // stutters, more with every year beyond the present
+    // wavers, more with every year beyond the present. The waver is a
+    // slow, smooth swell and fade (one change every 2–3 seconds, eased),
+    // never a sudden dip: Oct 2026 the earlier stutter read as a blink.
     if (u_future > 0.001) {
       float lum = dot(col, vec3(0.299, 0.587, 0.114));
       col = mix(col, vec3(lum) * vec3(0.92, 0.95, 1.05), u_future * 0.62);
-      float stutter = hash33(vec3(floor(u_time * 7.0), 3.1, 7.7)).x;
-      col *= 1.0 - u_future * 0.42 * step(0.55, stutter) * stutter;
+      float wt = u_time * 0.4;
+      float w0 = hash33(vec3(floor(wt), 3.1, 7.7)).x;
+      float w1 = hash33(vec3(floor(wt) + 1.0, 3.1, 7.7)).x;
+      float f  = fract(wt);
+      float waver = mix(w0, w1, f * f * (3.0 - 2.0 * f));
+      col *= 1.0 - u_future * 0.30 * waver;
       // Closing in from the edges: by the last year only a pool of
       // uncertain light remains at the centre
       float reach = mix(1.6, 0.42, u_future);
