@@ -67,6 +67,11 @@ const uniforms = {
   // grows unstable — it disperses, colour drains, the light wavers.
   u_future:     { value: 0.0 },
 
+  // The seam between windows (gallery, years.js), 0–1: the field
+  // settles and dims as the last future year ends, so the title can
+  // return over the quiet before the present comes back.
+  u_settle:     { value: 0.0 },
+
   // The visitors' archive (visitors.js) — a sixth light, kept by
   // people rather than machines. strength grows with the number of
   // words left; tone is heavy (0) to light (1); flash marks a new word.
@@ -151,6 +156,7 @@ const fragmentShader = /* glsl */`
   uniform float u_pulseAge;
   uniform float u_density;
   uniform float u_future;
+  uniform float u_settle;
   uniform float u_visitors;
   uniform float u_visitorTone;
   uniform float u_visitorFlash;
@@ -576,6 +582,7 @@ const fragmentShader = /* glsl */`
     /* ── Tone mapping ────────────────────────────────────────────
        Reinhard at shoulder 0.42 — preserves vivid saturation
        in mid-range while preventing blow-out where filaments cross. */
+    col *= 1.0 - u_settle * 0.78;
     col = col / (col + 0.42);
     col = max(col, vec3(0.004));
 
@@ -646,6 +653,7 @@ const consciousnessUniforms = {
 let lastTime = null;
 let densityTarget = 1.0;
 let futureTarget = 0.0;
+let settleTarget = 0.0;
 
 function animate(ts) {
   requestAnimationFrame(animate);
@@ -656,6 +664,8 @@ function animate(ts) {
   // Archive density eases toward its target over a few seconds
   uniforms.u_future.value += (futureTarget - uniforms.u_future.value) * Math.min(1, dt * 0.0012);
   uniforms.u_density.value += (densityTarget - uniforms.u_density.value) * Math.min(1, dt * 0.0012);
+  // The seam settles slowly: about five seconds to dim or to wake
+  uniforms.u_settle.value += (settleTarget - uniforms.u_settle.value) * Math.min(1, dt * 0.0007);
   if (window.planetarySignal) window.planetarySignal.tick(dt, performance.now());
   renderer.render(scene, camera);
   if (window.onFieldFrame) window.onFieldFrame(canvas);   // film.js composites each frame
@@ -692,6 +702,11 @@ window.fieldUniforms = uniforms;
 window.setFuture = function (f, immediate = false) {
   futureTarget = Math.max(0, Math.min(1, f));
   if (immediate) uniforms.u_future.value = futureTarget;
+};
+
+/* The seam between windows (years.js, gallery): 1 = settled and dim */
+window.setSettle = function (s) {
+  settleTarget = Math.max(0, Math.min(1, s));
 };
 
 window.setArchiveDensity = function (d, immediate = false) {

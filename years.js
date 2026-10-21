@@ -26,6 +26,12 @@
  * A year whose data is missing is passed over; the year before it
  * stays a little longer.
  *
+ * In the gallery (?gallery) the seam between windows is marked for
+ * people who arrive part-way through: as the last future year ends
+ * the field settles and dims (u_settle in main.js), then the title
+ * returns exactly as it did when the page opened — and withdraws on
+ * the same timing — while the colours wake again under the present.
+ *
  * Add ?years=fast to the URL to preview: 3 s per step, looping.
  *
  * Reads:  window.gdeltAdapter.fetchYear, window.planetarySignal
@@ -35,7 +41,9 @@
 
 (function () {
 
-  const FAST = new URLSearchParams(window.SA_PARAMS ?? location.search).get('years') === 'fast';
+  const PARAMS = new URLSearchParams(window.SA_PARAMS ?? location.search);
+  const FAST = PARAMS.get('years') === 'fast';
+  const GALLERY = PARAMS.has('gallery');
 
   const WINDOW_SECONDS = FAST ? 48 * 3 : 15 * 60;   // matches signal.js's update interval
 
@@ -45,6 +53,11 @@
   const TREND_YEARS = 15;                           // how far back the trends are read
   const SIGNALS = ['attention', 'curiosity', 'hope', 'fear', 'wonder'];
   const LABEL_FADE_MS = 1400;
+
+  // The seam (gallery): how long before the window ends the field
+  // begins to settle, and how long into the new present it wakes
+  const SETTLE_LEAD = FAST ? 3 : 9;
+  const WAKE_AFTER  = FAST ? 1 : 2.5;
 
 
   /* ── Archive density ──────────────────────────────────────
@@ -117,6 +130,36 @@
       label.textContent = text;
       label.classList.remove('is-changing');
     }, LABEL_FADE_MS / 2);
+  }
+
+
+  /* ── The title returns (gallery) ──────────────────────────
+     Restarts the title block's own CSS animations, so it rises and
+     withdraws with exactly the timing of the page opening
+     (styles.css: fadeUp, then fadeAway at 30 s). */
+
+  const header = document.querySelector('header.ui-overlay');
+  const pageOpened = performance.now();
+  let titleShownAt = pageOpened;
+
+  function replayTitle() {
+    if (!GALLERY || !header) return;
+    const now = performance.now();
+    if (now - titleShownAt < 60000) return;    // just shown (page open, or a late update)
+    titleShownAt = now;
+    const parts = [header, ...header.querySelectorAll('.title, .subtitle, .hint')];
+    parts.forEach((el) => { el.style.animation = 'none'; });
+    void header.offsetWidth;                    // let the reset land
+    parts.forEach((el) => { el.style.animation = ''; });
+  }
+
+  function settle()  { if (GALLERY) window.setSettle?.(1); }
+  function wake()    { window.setSettle?.(0); }
+
+  /* A new window: the title back over the quiet, then the colours wake */
+  function openSeam() {
+    replayTitle();
+    later(WAKE_AFTER, wake);
   }
 
 
@@ -285,12 +328,14 @@
     for (let k = 1; k <= FUTURE_YEARS; k++) {
       later((count + 1 + k) * each, () => showFuture(state.liveYear + k, k));
     }
+    // The last future year ends: the field settles before the present returns
+    later(WINDOW_SECONDS - SETTLE_LEAD, settle);
     // The next live update normally arrives right on time and takes over.
     // If it's late, return to the present rather than linger in the past;
     // in preview mode, start the journey again.
     later(WINDOW_SECONDS + (FAST ? 0 : 45), () => {
       if (FAST) startWindow(state.slot, true);
-      else showPresent();
+      else { showPresent(); openSeam(); }
     });
   }
 
@@ -305,6 +350,7 @@
     if (state.slot) state.liveYear = parseInt(state.slot.slice(0, 4), 10);
 
     showPresent();
+    openSeam();
     if (!state.slot) return;                      // simulated data: no archive to visit
 
     if (!sameSlot) {
@@ -339,6 +385,7 @@
     // Past years need their data loaded; future years are extrapolated.
     show(year) {
       clearTimers();
+      wake();
       if (year === state.liveYear) { showPresent(); return true; }
       if (year < state.liveYear) return showPast(year);
       const k = year - state.liveYear;
