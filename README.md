@@ -100,3 +100,16 @@ A gallery machine would open, for example:
 
 Cloudflare Pages builds from the `main` branch of this repo — no build step,
 output directory is the repository root.
+
+## BRAIN (`/brain/`)
+
+A version made for the MIT Museum BRAIN Digital Content Open Call (2026): the same five
+colour fields, driven by resting-state EEG instead of GDELT, framed at the MIT Exchange
+LED wall's 80:63 ratio (3840 x 3024). Live at https://second-atmosphere-live.pages.dev/brain/
+
+- Data: OpenNeuro ds002778 v1.0.5 (CC0), participant hc1, healthy control, eyes-at-rest EEG.
+  Band power (delta, theta, alpha, beta, gamma) is precomputed and embedded in the page.
+- delta → blue, theta → magenta, alpha → yellow, beta → green, gamma → red.
+- The 192 s recording plays at one-third speed, forward then back: a 19 min 12 s loop.
+  The title, the five brainwave traces and the colour key return at the start of each loop.
+- Self-contained: `brain/index.html` needs no Worker and no other files.

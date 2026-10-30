@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="The Second Atmosphere, tuned to a resting human brain: five colour fields driven by resting-state EEG (OpenNeuro ds002778). rsduffield, 2026.">
+<title>The Second Atmosphere — BRAIN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@300;400&family=Instrument+Sans:wdth,wght@75..100,400;75..100,600&display=swap">
+<style>
+[hidden]{display:none!important}
+/* Layout: the field fills an 80:63 frame (the MIT Exchange LED wall), letterboxed in black; a quiet readout sits over it. Single dark look by choice. */
+:root {
+  --void: #020106;
+  --frame: #0b0a12;
+  --ink: #e8e4f2;
+  --ink-dim: #8c86a0;
+  --rule: #2a2638;
+  --blue: #0038ff; --magenta: #ff00d9; --yellow: #fff200; --green: #00eb2e; --red: #ff0800;
+  --f-title: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --f-data: "Azeret Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { margin: 0; background: var(--void); color: var(--ink); overflow: hidden;
+  padding-left: max(0px, env(safe-area-inset-left, 0px)); padding-right: max(0px, env(safe-area-inset-right, 0px)); }
+#stage { position: absolute; inset: 0; display: grid; place-items: center; }
+#wall { position: relative; aspect-ratio: 80 / 63; width: min(100%, calc((100vh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) * 80 / 63)); max-width: 100%; background: #000; box-shadow: 0 0 0 1px var(--rule); }
+body.fill #wall { width: 100%; height: 100%; aspect-ratio: auto; box-shadow: none; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+#title { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
+  font: 600 max(14px, 3cqw)/1 var(--f-title); font-stretch: 78%; letter-spacing: .42em; text-indent: .42em; color: var(--ink);
+  opacity: 0; transition: opacity 3.5s ease; text-align: center; }
+#title.on { opacity: .92; }
+#wall #eegviz { position: static; inset: auto; display: block; width: 100%; height: auto; aspect-ratio: 5 / 1; margin-top: 1.4em; }
+#title .tblock { width: 62cqw; }
+#title small { display: block; margin-top: 1.1em; font: 300 .38em/1.4 var(--f-data); letter-spacing: .3em; color: var(--ink-dim); }
+
+#clock { position: absolute; left: 2.2%; bottom: 2.6%; font: 300 clamp(9px, .95vw, 15px)/1.4 var(--f-data); color: var(--ink); opacity: .62; letter-spacing: .08em; font-variant-numeric: tabular-nums; pointer-events: none; }
+
+#panel { position: absolute; right: 2.2%; bottom: 2.6%; transform: scale(0.2); transform-origin: bottom right; width: 27cqw;
+  background: color-mix(in srgb, var(--frame) 82%, transparent); backdrop-filter: blur(8px);
+  border: 1px solid var(--rule); border-radius: 4px; padding: .9em 1.1em; font: 400 1cqw/1.45 var(--f-data); color: var(--ink-dim); display: grid; gap: .7em;
+  opacity: 1; transition: opacity 10s ease-in-out; pointer-events: none; }
+#panel.gone { opacity: 0; }
+#wall { container-type: inline-size; }
+
+#panel h2 { margin: 0; font: 600 1em/1.2 var(--f-title); letter-spacing: .18em; text-transform: uppercase; color: var(--ink); }
+.band { display: grid; grid-template-columns: .9em 1fr auto; gap: .35em .7em; align-items: center; }
+.sw { width: .9em; height: .9em; border-radius: 50%; }
+.band .meter { grid-column: 2 / 4; height: .28em; background: var(--rule); position: relative; }
+.band .meter i { position: absolute; inset: 0 auto 0 0; width: 0; background: currentColor; transition: width .25s linear; }
+.band b { color: var(--ink); font-weight: 400; }
+#panel p { margin: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; }
+button { font: 400 11px/1 var(--f-data); color: var(--ink); background: transparent; border: 1px solid var(--rule); border-radius: 3px; padding: 6px 9px; cursor: pointer; }
+button:hover { border-color: var(--ink-dim); }
+button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+#err { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; font: 400 13px/1.5 var(--f-data); color: var(--ink-dim); }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="wall">
+    <canvas id="c"></canvas>
+    <div id="title"><div class="tblock">THE SECOND ATMOSPHERE<canvas id="eegviz" aria-label="EEG band traces"></canvas><small>a collective field · tuned to a resting brain</small></div></div>
+    <div id="clock" hidden></div>
+    <div id="panel" role="region" aria-label="EEG readout">
+      <h2>Brainwave bands driving the field</h2>
+      <div id="bands"></div>
+      <p>Resting-state EEG, 32 scalp electrodes, 192 s. OpenNeuro ds002778, participant hc1 (healthy control). Played at one-third speed, forward then back.</p>
+    </div>
+    <div id="err" hidden>WebGL is not available in this browser, so the field can't be drawn here.</div>
+  </div>
+</div>
+
+
+<script>
+/* ── EEG band power from OpenNeuro ds002778 sub-hc1 (resting, 512 Hz BDF).
+   Average-referenced, 2 s Hann windows every 0.5 s, FFT across 32 channels,
+   relative band power (log), each band scaled 0–99 between its 5th and 95th percentile.
+   Bands: delta 1–4, theta 4–8, alpha 8–13, beta 13–30, gamma 30–45 Hz. */
+const RAW = "819394866553544063484246909089907364748594948779343023467864679295744041759597997426899377192602000029226392915665703545849384999996957492937175759085433366635058919799920205180002322113456599999699868190918893760143898000063811232516262925133028727762177158000428252316173745202687969144424021000016314195999073827564869593834026182463747434374861969890989999969495959864355794870000405219193649466958012526162227151615120525458796873535040007121913324320859384235231351313172634473878949100140000000072949123000002285033452927354845684873692451181607000608082830504316007271949687999899997765466094999995544419608583497295999999844161868539709291503544240007002720337192999981405839264865590522659395614383959796979999999684422830609394603100276973799195968974|999883595664679658647581999999994522217682656046698061511029479183687967819172251237948056897143414649629996765345669161535537000000006096795641838861415164624234005562625463876564888961474400000000998692807582627691827734272933373537899999995557213159675559595532505740623947336692642064754468796463968042344728112367696862427469735229332136717773524052120000366678794425428471606288343999999996666160606358756445617762639879739077757662566027539999756853979578684444515153654742575875775573929399738786684258583445626568482846644335242929397438568796926077807187672353752132584158515247294553443829000000558987979999957647000000079368999986499082646068792842575161415783160006754545596264777447868328225538495257601200001360255457799179576361675831309991587495|411419476867546050667068302421174649433818153151827872615156692916536579591100004156211450787487919076715218367764518084532027001163656723205447403251819276737381510600207894888185868894836500006550432712171918487168194981889799919699867366728087564161776573757464729291706774918833032361576877969484858127004067455974360514427980819781595890785955200648270938391900000060837117439694887478796760807680969285848676798282777170582300257395999497999295876763230923565060677882868985768153164099979997999965274792969999998784869081787888798570729280999999949287777273757570876266342650000000065751475418001242726066573838603802000027586452364496773039759389999996999791835213142658868273766861729188681522707242070200151500005167999999832930828798876347421400053444|530307467481858981929391211321237177745304184770949497896985781103729593630000198599382370969599979896997107268281769187523465000229266600127275722853898772768881440700449999949997848995887700001800255429284021709985406199988289959391919093999693787283997686999999999596959389928939094892939599979999868527004273687373442137609095968774727290938980160533090000142309060773887720479593888593908685866977938994959797979597989692894300438985849594908482869199500751999096929698939191858759113492859192959056083991979690837890869093928886698269729187908788939698999492838898997473212347000100056576898535071542879399780813887629000007598881252776681027959185769195978985846616041766888094968877799494732027769263251421040000001343818286730402739099987780742100133965|460410577991919286848583262337358194835219385962838897957682721910678679630201036691341967929599999894968231397876768380574162000000106823368072653250878770768777501900278380879299919288838300000200347044405724689992465799998688898288888890929088747479896370959997908493999890959347175292929192889088888735004369677275612834678491948878737787858884241843230000133431303193948233549997858794969586836578978990948894989596999999944913609480889995858789909198482067999399989998979390899267234592909095989273284189978981807989829397918582768773758580797985959592969693869599997874322747000400227288998841030017818595802029837240000000619286323579671614647375799593848398998542171965807590958980789694713044908866361729140000000443757879660516788888787171662700214469";
+const BANDS = RAW.split('|').map(s => { const a = new Float32Array(s.length / 2); for (let i = 0; i < a.length; i++) a[i] = +s.substr(i * 2, 2) / 99; return a; });
+const NF = BANDS[0].length, HOP = 0.5, REC = 192, SLOW = 3;
+const META = [
+  ['δ delta', '1–4 Hz', 'blue', '--blue'],
+  ['θ theta', '4–8 Hz', 'magenta', '--magenta'],
+  ['α alpha', '8–13 Hz', 'yellow', '--yellow'],
+  ['β beta', '13–30 Hz', 'green', '--green'],
+  ['γ gamma', '30–45 Hz', 'red', '--red'],
+];
+
+/* readout */
+const bandsEl = document.getElementById('bands'); const meters = [];
+META.forEach(([n, hz, c, v]) => {
+  const d = document.createElement('div'); d.className = 'band';
+  d.innerHTML = `<span class="sw" style="background:var(${v})"></span><span><b>${n}</b> ${hz} → ${c}</span><span class="val">0</span><span class="meter" style="color:var(${v})"><i></i></span>`;
+  bandsEl.appendChild(d); meters.push([d.querySelector('i'), d.querySelector('.val')]);
+});
+
+/* ── WebGL ─────────────────────────────────────────────── */
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl', { antialias: false, alpha: false, preserveDrawingBuffer: false });
+
+const VS = `attribute vec2 a; varying vec2 vUv; void main(){ vUv = a*0.5+0.5; gl_Position = vec4(a,0.0,1.0); }`;
+const FS = `
+precision highp float;
+uniform float u_time; uniform vec2 u_res;
+uniform float u_delta, u_theta, u_alpha, u_beta, u_gamma;
+uniform float u_tB, u_tM, u_tY, u_tG, u_tR, u_alphaPhase, u_intro;
+uniform vec3 u_blue, u_magenta, u_yellow, u_green, u_red;
+varying vec2 vUv;
+
+vec3 hash33(vec3 p){ p = fract(p*vec3(443.8975,397.2973,491.1871)); p += dot(p,p.yxz+19.19); return fract((p.xxy+p.yxx)*p.zyx); }
+float gnoise(vec3 p){
+  vec3 i=floor(p), f=fract(p); vec3 u=f*f*f*(f*(f*6.0-15.0)+10.0);
+  #define G(o) (hash33(i+(o))*2.0-1.0)
+  #define N(o) dot(G(o), f-(o))
+  return mix(mix(mix(N(vec3(0,0,0)),N(vec3(1,0,0)),u.x), mix(N(vec3(0,1,0)),N(vec3(1,1,0)),u.x),u.y),
+             mix(mix(N(vec3(0,0,1)),N(vec3(1,0,1)),u.x), mix(N(vec3(0,1,1)),N(vec3(1,1,1)),u.x),u.y),u.z)*0.5+0.5;
+}
+float fbmLow(vec3 p){ float v=0.0,a=0.60,f=1.0; v+=a*gnoise(p); f*=2.07; a*=0.5; v+=a*gnoise(p*f); return v; }
+float fbmRidge(vec3 p){
+  float v=1.0,f=1.0; const float L=2.17; float r;
+  r=1.0-abs(gnoise(p)*2.0-1.0); v*=pow(r,0.7); f*=L;
+  r=1.0-abs(gnoise(p*f)*2.0-1.0); v*=pow(r,0.8); f*=L;
+  p+=vec3(31.41,17.32,53.58);
+  r=1.0-abs(gnoise(p*f)*2.0-1.0); v*=pow(r,0.9); f*=L;
+  r=1.0-abs(gnoise(p*f)*2.0-1.0); v*=pow(r,1.0);
+  return clamp(v,0.0,1.0);
+}
+vec3 warp(vec3 p,float t,float ws){
+  vec3 w1=vec3(fbmLow(p+vec3(t*0.38,t*0.25,t*0.17)), fbmLow(p+vec3(t*0.29,t*0.41,t*0.23)+5.2), fbmLow(p+vec3(t*0.21,t*0.16,t*0.35)+3.7));
+  vec3 p1=p+w1*ws;
+  vec3 w2=vec3(fbmLow(p1+vec3(t*0.17,t*0.28,t*0.39)+1.8), fbmLow(p1+vec3(t*0.26,t*0.14,t*0.31)+8.3), fbmLow(p1+vec3(t*0.33,t*0.21,t*0.16)+6.1));
+  return p1+w2*ws*0.5;
+}
+vec2 field(vec3 p,float t,float ls,float fs,float wa){ return vec2(fbmLow(warp(p*ls,t,wa)), fbmRidge(warp(p*fs,t,wa*0.8))); }
+float comp(vec2 cf){ float lobe=smoothstep(0.28,0.72,cf.x); float fil=cf.y*lobe; return clamp(pow(fil,2.5)*1.42+pow(fil,0.60)*0.52,0.0,1.0); }
+float grade(float v){ return clamp(v*v*(3.0-2.0*v)*1.08,0.0,1.0); }
+
+void main(){
+  float aspect=u_res.x/u_res.y;
+  vec2 uv=(vUv-0.5)*vec2(aspect,1.0);
+  float dist=length(uv);
+  float rot=u_time*0.0024 + (u_theta-0.5)*0.35;
+  vec2 ruv=vec2(uv.x*cos(rot)-uv.y*sin(rot), uv.x*sin(rot)+uv.y*cos(rot));
+  vec3 p=vec3(ruv*0.88, u_time*0.0072);
+  float turb=(u_beta+u_gamma)*0.32;
+
+  /* BLUE ← delta: the slowest wave sets the breathing lobes */
+  float breath=0.62+0.18*sin(u_time*0.0128) + (u_delta-0.5)*0.16;
+  vec2 cfB=field(p,u_tB,breath,breath*1.55,0.30+u_delta*0.16);
+  float fB=grade(comp(cfB))*(0.62+u_delta*0.62);
+
+  /* MAGENTA ← theta: drawn into blue's topology, deeper when theta rises */
+  vec3 pM=p+vec3(cfB.x*0.50,cfB.x*0.32,cfB.x*0.21)*(0.6+u_theta*0.8)+vec3(6.28,3.14,9.42);
+  vec2 cfM=field(pM,u_tM,0.78,1.32,0.40+u_theta*0.22);
+  float fM=grade(comp(cfM))*(0.55+u_theta*0.70);
+
+  /* YELLOW ← alpha: radial bloom, and a slowed alpha rhythm in its light */
+  float bloom=0.68+u_alpha*0.42;
+  vec3 pY=p*(1.0-dist*0.20*bloom)+vec3(2.71,7.39,4.67);
+  vec2 cfY=field(pY,u_tY,0.92,1.58,0.46+u_alpha*0.18);
+  float pulseA=0.5+0.5*sin(u_alphaPhase);
+  float fY=grade(comp(cfY))*(0.55+u_alpha*0.70)*(1.0+u_alpha*0.10*(pulseA-0.5));
+
+  /* GREEN ← beta: active, attentive spread */
+  float gw=max((0.62-turb*0.45)*(0.80+u_beta*0.40),0.05);
+  vec2 cfG=field(p+vec3(4.18,1.95,6.87),u_tG,0.80,1.40,gw);
+  float fG=grade(comp(cfG))*(0.60+u_beta*0.55);
+
+  /* RED ← gamma: latent, ignites at the fast edge of the spectrum */
+  vec2 cfR=field(p+vec3(8.73,2.41,5.95),u_tR,1.08,1.72,0.48+turb);
+  float redRaw=comp(cfR);
+  float fR=grade(pow(redRaw, mix(3.8,0.9,u_gamma*0.85)));
+
+  vec3 col=vec3(0.0);
+  col+=u_blue*fB*1.06; col+=u_magenta*fM*0.98; col+=u_yellow*fY*0.93; col+=u_green*fG*0.86; col+=u_red*fR*1.30;
+  float cr=fB*fM+fB*fY+fM*fY+fG*fY+fR*fB+fR*fM;
+  col+=vec3(1.0,0.96,0.90)*min(cr*0.11,0.09);
+  float total=fB+fM+fY+fG+fR;
+  col+=vec3(0.008,0.005,0.018)*clamp(1.0-total*0.8,0.0,1.0);
+  col*=(0.88+0.12*sin(u_time*0.00198))*(0.96+0.04*sin(u_time*0.00067));
+  col*=1.0-smoothstep(0.42,0.82,length(vUv-0.5))*0.28;
+  col*=u_intro;
+  col=col/(col+0.42);
+  gl_FragColor=vec4(max(col,vec3(0.004)),1.0);
+}`;
+
+let prog, U = {}, ok = !!gl;
+const errEl = document.getElementById('err');
+const fail = msg => { ok = false; errEl.textContent = msg; errEl.hidden = false; };
+if (gl) try {
+  const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
+  prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
+  const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  ['u_time','u_res','u_delta','u_theta','u_alpha','u_beta','u_gamma','u_tB','u_tM','u_tY','u_tG','u_tR','u_alphaPhase','u_intro','u_wB','u_wM','u_wY','u_wG','u_wR','u_blue','u_magenta','u_yellow','u_green','u_red'].forEach(n => U[n] = gl.getUniformLocation(prog, n));
+  gl.uniform3f(U.u_blue, 0.00, 0.22, 1.00); gl.uniform3f(U.u_magenta, 1.00, 0.00, 0.85);
+  gl.uniform3f(U.u_yellow, 1.00, 0.95, 0.00); gl.uniform3f(U.u_green, 0.00, 0.92, 0.18); gl.uniform3f(U.u_red, 1.00, 0.03, 0.00);
+} catch (e) { fail('The field could not start on this device: ' + (e.message || e)); }
+else fail("WebGL is not available in this browser, so the field can't be drawn here.");
+canvas.addEventListener('webglcontextlost', ev => { ev.preventDefault(); fail('The graphics card stopped drawing the field. Reload the page to try again at a lower resolution.'); try { sessionStorage.setItem('sa-lowres', '1'); } catch (_) {} });
+
+/* render size: start modest and adapt to the device. The field is soft, so a
+   lower render resolution scaled up by the browser still reads well. */
+const wall = document.getElementById('wall');
+let maxPx = 7e5;
+try { if (sessionStorage.getItem('sa-lowres')) maxPx = 2e5; } catch (_) {}
+function resize() {
+  const r = wall.getBoundingClientRect();
+  let s = Math.min(window.devicePixelRatio || 1, 1.5);
+  if (r.width * r.height * s * s > maxPx) s = Math.sqrt(maxPx / (r.width * r.height));
+  canvas.width = Math.max(2, Math.round(r.width * s)); canvas.height = Math.max(2, Math.round(r.height * s));
+  if (ok) { gl.viewport(0, 0, canvas.width, canvas.height); gl.uniform2f(U.u_res, canvas.width, canvas.height); }
+}
+let slowFrames = 0, fastFrames = 0;
+function adapt(dtMs) {
+  if (dtMs > 45) { slowFrames++; fastFrames = 0; } else if (dtMs < 20) { fastFrames++; slowFrames = 0; }
+  if (slowFrames > 20 && maxPx > 1.2e5) { maxPx *= 0.6; slowFrames = 0; resize(); }
+  if (fastFrames > 240 && maxPx < 1.4e6) { maxPx *= 1.3; fastFrames = 0; resize(); }
+}
+new ResizeObserver(resize).observe(wall); resize();
+
+/* EEG playback: one-third speed, forward then back (a seamless loop) */
+function sampleEEG(sec) {
+  const span = REC * SLOW, cyc = (sec % (2 * span)); const fwd = cyc < span;
+  const eegSec = (fwd ? cyc : 2 * span - cyc) / SLOW;
+  const x = Math.min(NF - 1.001, Math.max(0, eegSec / HOP)); const i = Math.floor(x), f = x - i;
+  const k = f * f * (3 - 2 * f);
+  return { eegSec, v: BANDS.map(a => a[i] * (1 - k) + a[i + 1] * k) };
+}
+
+/* EEG traces under the title: five lanes, one per band, a 40 s window
+   centred on the playhead, drawn in each band's colour */
+const viz = document.getElementById('eegviz'), vctx = viz.getContext('2d');
+const VCOL = ['#2a5cff', '#ff2ee0', '#fff23a', '#22f04a', '#ff3a2a'];
+function drawViz(eegSec) {
+  const r = viz.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2);
+  const W = Math.round(r.width * d), H = Math.round(r.height * d);
+  if (!W || !H) return;
+  if (viz.width !== W || viz.height !== H) { viz.width = W; viz.height = H; }
+  vctx.clearRect(0, 0, W, H);
+  const span = 40, lane = H / 5, n = 160;
+  vctx.lineWidth = Math.max(1, 1.2 * d); vctx.lineJoin = 'round';
+  for (let b = 0; b < 5; b++) {
+    const arr = BANDS[b], y0 = lane * (b + 1) - lane * 0.12, amp = lane * 0.76;
+    vctx.strokeStyle = VCOL[b]; vctx.globalAlpha = 0.9; vctx.beginPath();
+    let started = false;
+    for (let j = 0; j <= n; j++) {
+      const t = eegSec - span * 0.08 + span * j / n;
+      if (t < 0 || t > REC - HOP) { started = false; continue; }
+      const x = Math.min(NF - 1.001, Math.max(0, t / HOP)), i = Math.floor(x), f = x - i;
+      const v = arr[i] * (1 - f) + arr[i + 1] * f;
+      const px = W * j / n, py = y0 - v * amp;
+      started ? vctx.lineTo(px, py) : vctx.moveTo(px, py); started = true;
+    }
+    vctx.stroke();
+  }
+  vctx.globalAlpha = 0.5; vctx.fillStyle = '#e8e4f2'; vctx.fillRect(W * 0.08 - d * 0.5, 0, d, H);
+  vctx.globalAlpha = 1;
+}
+
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const title = document.getElementById('title'), clock = document.getElementById('clock');
+const sm = [0.5, 0.5, 0.5, 0.5, 0.5]; const ph = [0, 0, 0, 0, 0]; const dom = [0.6, 0.6, 0.6, 0.6, 0.6];
+let T = 0, last = performance.now(), wall0 = performance.now(), alphaPh = 0, lastUI = 0, titleShown = false;
+const BASE = [0.28, 0.43, 0.57, 0.35, 1.38];
+const fmt = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+/* the opening: title, brainwave traces and colour table, repeated at the
+   start of every loop (each forward-and-back pass, 19 min 12 s) */
+let loopIdx = 0;
+function intro(first) {
+  const panel = document.getElementById('panel');
+  setTimeout(() => title.classList.add('on'), first ? 600 : 0);
+  setTimeout(() => title.classList.remove('on'), first ? 9000 : 8400);
+  if (!first) { panel.style.transition = 'opacity 2s ease'; panel.classList.remove('gone'); }
+  setTimeout(() => { panel.style.transition = ''; panel.classList.add('gone'); }, first ? 10000 : 10000);
+}
+
+function frame(now) {
+  const dtMs = Math.max(0, now - last); const dt = Math.min(0.1, dtMs / 1000); last = Math.max(last, now);
+  if (ok) adapt(dtMs);
+  const el = Math.max(0, (now - wall0) / 1000);
+  const speed = reduce ? 0.35 : 1;
+  T += dt * speed;
+  const { eegSec, v } = sampleEEG(el);
+  const li = Math.floor(el / (2 * REC * SLOW));
+  if (li !== loopIdx) { loopIdx = li; intro(false); }
+  const a = 1 - Math.exp(-dt / 2.5);               // ~2.5 s visual smoothing
+  for (let b = 0; b < 5; b++) { if (Number.isFinite(v[b])) sm[b] += (v[b] - sm[b]) * a; if (!Number.isFinite(sm[b])) sm[b] = 0.5; ph[b] += dt * speed * BASE[b] * (0.75 + 0.5 * sm[b]); }
+  /* contrast: stretch each band around its middle, then let the strongest
+     band lead and the weakest recede, so one or two colours hold the wall at a time */
+  const c = sm.map(x => Math.min(1, Math.max(0, (x - 0.5) * 2.0 + 0.5)));
+  const mx = Math.max(...c) + 1e-3;
+  const da = 1 - Math.exp(-dt / 1.5);
+  for (let b = 0; b < 5; b++) { dom[b] += (Math.pow(c[b] / mx, 3.2) - dom[b]) * da; if (!Number.isFinite(dom[b])) dom[b] = 0.6; }
+  alphaPh += dt * 2 * Math.PI * (10 / 40);         // 10 Hz alpha slowed 40× → one swell every 4 s
+  if (ok) {
+    gl.uniform1f(U.u_time, T);
+    gl.uniform1f(U.u_delta, sm[0]); gl.uniform1f(U.u_theta, sm[1]); gl.uniform1f(U.u_alpha, sm[2]); gl.uniform1f(U.u_beta, sm[3]); gl.uniform1f(U.u_gamma, sm[4]);
+    gl.uniform1f(U.u_tB, ph[0]); gl.uniform1f(U.u_tM, ph[1]); gl.uniform1f(U.u_tY, ph[2]); gl.uniform1f(U.u_tG, ph[3]); gl.uniform1f(U.u_tR, ph[4]);
+    gl.uniform1f(U.u_alphaPhase, alphaPh);
+    gl.uniform1f(U.u_wB, dom[0]); gl.uniform1f(U.u_wM, dom[1]); gl.uniform1f(U.u_wY, dom[2]); gl.uniform1f(U.u_wG, dom[3]); gl.uniform1f(U.u_wR, dom[4]);
+    gl.uniform1f(U.u_intro, Math.min(1, 0.35 + el / 1.5));
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+  if (now - lastUI > 200) {
+    lastUI = now;
+    clock.textContent = `EEG ${fmt(eegSec)} / ${fmt(REC)}`;
+    if (getComputedStyle(title).opacity > 0.01) drawViz(eegSec);
+    meters.forEach(([bar, val], b) => { bar.style.width = (sm[b] * 100).toFixed(1) + '%'; val.textContent = Math.round(sm[b] * 100); });
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* the colour table: shown for the first 10 s, then fades out slowly over the next 10 s */
+intro(true);
+/* double-click the field for fullscreen */
+wall.addEventListener('dblclick', () => { const p = document.documentElement.requestFullscreen?.(); p && p.catch(() => {}); });
+</script>
+
+</body>
+</html>
