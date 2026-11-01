@@ -1000,6 +1000,7 @@
      ============================================================ */
 
   window.planetaryAudio = {
+    get on() { return isOn; },
     // Start the sound (needs a click or key press first, as browsers require)
     start() {
       if (!ctx) buildAudioGraph();
@@ -1020,6 +1021,22 @@
                  [k, { theta: +(v.theta % TAU).toFixed(2), spread: +v.spread.toFixed(2) }])) };
     },
   };
+
+  /* After a recovery reload (main.js), restart the sound if it was playing,
+     but only where the browser allows sound without a click, so the sound
+     button never ends up showing "on" while silent. */
+  try {
+    if (sessionStorage.getItem('sa-resume-sound')) {
+      sessionStorage.removeItem('sa-resume-sound');
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const probe = AC && new AC();
+      if (probe) {
+        const allowed = probe.state === 'running';
+        probe.close();
+        if (allowed) window.addEventListener('load', () => window.planetaryAudio.start());
+      }
+    }
+  } catch (_) {}
 
   function toggleResonance() {
     if (!ctx) return;

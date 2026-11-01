@@ -20,6 +20,16 @@
 const canvas = document.getElementById('globe-canvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
 
+// If the graphics driver resets (Windows updates sometimes do this), reload by
+// ourselves after a moment rather than leaving a frozen screen in the gallery.
+// If the sound was playing, audio.js starts it again once the page is back,
+// wherever the browser allows sound without a click (Nov 2026).
+canvas.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  try { if (window.planetaryAudio?.on) sessionStorage.setItem('sa-resume-sound', '1'); } catch (_) {}
+  setTimeout(() => location.reload(), 3000);
+});
+
 // Film mode (film.js): a fixed frame, whatever the window.
 // ?film = 1920 × 1080 · ?film=4k = 3840 × 2160 · ?film=720 = 1280 × 720 · ?film=test = 640 × 360
 const FILM_PARAM = new URLSearchParams(window.SA_PARAMS ?? location.search).get('film');
