@@ -163,7 +163,7 @@ void main(){
 
   /* YELLOW ← alpha: radial bloom, and a slowed alpha rhythm in its light */
   float bloom=0.68+u_alpha*0.42;
-  vec3 pY=p*(1.0-dist*0.20*bloom)+vec3(2.71,7.39,4.67);
+  vec3 pY=vec3(p.xy*(1.0-dist*0.20*bloom), p.z)+vec3(2.71,7.39,4.67);  // bloom compresses space only, never time
   vec2 cfY=field(pY,u_tY,0.92,1.58,0.46+u_alpha*0.18);
   float pulseA=0.5+0.5*sin(u_alphaPhase);
   float fY=grade(comp(cfY))*(0.55+u_alpha*0.70)*(1.0+u_alpha*0.10*(pulseA-0.5));
@@ -292,8 +292,14 @@ function frame(now) {
   const speed = reduce ? 0.35 : 1;
   T += dt * speed;
   const { eegSec, v } = sampleEEG(el);
-  const li = Math.floor(el / (2 * REC * SLOW));
-  if (li !== loopIdx) { loopIdx = li; intro(false); }
+  const LOOP = 2 * REC * SLOW, li = Math.floor(el / LOOP), lp = el - li * LOOP;
+  /* Each loop starts the field's clocks from zero again, so they never grow
+     large enough to lose precision on the graphics card (after a day or more
+     the field would smear and the yellow field collapse into rings). The reset
+     happens at the darkest point of a short dip as the title returns. */
+  if (li !== loopIdx) { loopIdx = li; T = 0; ph.fill(0); alphaPh = 0; intro(false); }
+  const ss = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+  const fade = ss((LOOP - lp) / 2.5) * (li === 0 ? Math.min(1, 0.35 + lp / 1.5) : ss(lp / 2.5));
   const a = 1 - Math.exp(-dt / 2.5);               // ~2.5 s visual smoothing
   for (let b = 0; b < 5; b++) { if (Number.isFinite(v[b])) sm[b] += (v[b] - sm[b]) * a; if (!Number.isFinite(sm[b])) sm[b] = 0.5; ph[b] += dt * speed * BASE[b] * (0.75 + 0.5 * sm[b]); }
   /* contrast: stretch each band around its middle, then let the strongest
@@ -309,7 +315,7 @@ function frame(now) {
     gl.uniform1f(U.u_tB, ph[0]); gl.uniform1f(U.u_tM, ph[1]); gl.uniform1f(U.u_tY, ph[2]); gl.uniform1f(U.u_tG, ph[3]); gl.uniform1f(U.u_tR, ph[4]);
     gl.uniform1f(U.u_alphaPhase, alphaPh);
     gl.uniform1f(U.u_wB, dom[0]); gl.uniform1f(U.u_wM, dom[1]); gl.uniform1f(U.u_wY, dom[2]); gl.uniform1f(U.u_wG, dom[3]); gl.uniform1f(U.u_wR, dom[4]);
-    gl.uniform1f(U.u_intro, Math.min(1, 0.35 + el / 1.5));
+    gl.uniform1f(U.u_intro, fade);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
   if (now - lastUI > 200) {
