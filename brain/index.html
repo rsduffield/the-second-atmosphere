@@ -225,13 +225,14 @@ try { resets = +sessionStorage.getItem('sa-resets') || 0; } catch (_) {}
 let maxPx = 1.2e6 / Math.pow(2, resets);   // current pixel budget
 let ceiling = Infinity;                     // the most this device has shown it can sustain
 let stableSince = performance.now();
+const WALL_PX = 3840 * 3024;   // never draw more pixels than the MIT wall has
 function nativePx() {
-  const r = wall.getBoundingClientRect(), s = Math.min(window.devicePixelRatio || 1, 2);
-  return r.width * r.height * s * s;
+  const r = wall.getBoundingClientRect(), s = Math.min(window.devicePixelRatio || 1, 1.5);
+  return Math.min(r.width * r.height * s * s, WALL_PX);
 }
 function resize() {
   const r = wall.getBoundingClientRect();
-  let s = Math.min(window.devicePixelRatio || 1, 2);
+  let s = Math.min(window.devicePixelRatio || 1, 1.5);
   if (r.width * r.height * s * s > maxPx) s = Math.sqrt(maxPx / (r.width * r.height));
   canvas.width = Math.max(2, Math.round(r.width * s)); canvas.height = Math.max(2, Math.round(r.height * s));
   if (ok) { gl.viewport(0, 0, canvas.width, canvas.height); gl.uniform2f(U.u_res, canvas.width, canvas.height); }
