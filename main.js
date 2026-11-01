@@ -44,6 +44,11 @@ const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
 const uniforms = {
   u_time:       { value: 0.0 },
+  u_time2:      { value: 0.0 },
+  u_xfade:      { value: 0.0 },
+  u_rot:        { value: 0.0 },
+  u_breath:     { value: 0.88 * 0.96 },
+  u_blueBreath: { value: 0.62 },
   u_resolution: { value: FILM ? new THREE.Vector2(FILM_W, FILM_H) : new THREE.Vector2(window.innerWidth, window.innerHeight) },
 
   u_intensity:  { value: 1.0 },
@@ -144,6 +149,11 @@ const fragmentShader = /* glsl */`
   precision highp float;
 
   uniform float u_time;
+  uniform float u_time2;     // the fresh clock during a rebase crossfade
+  uniform float u_xfade;     // 0 = u_time only, 1 = u_time2 only
+  uniform float u_rot;       // slow rotation, kept continuous in JS
+  uniform float u_breath;    // slow global breath, kept continuous in JS
+  uniform float u_blueBreath;
   uniform vec2  u_resolution;
   uniform float u_intensity;
   uniform float u_turbulence;
@@ -323,7 +333,7 @@ const fragmentShader = /* glsl */`
 
   /* ── Main ─────────────────────────────────────────────────── */
 
-  void main() {
+  vec3 sceneAt(float tm) {
 
     float aspect = u_resolution.x / u_resolution.y;
     vec2  uv     = (vUv - 0.5) * vec2(aspect, 1.0);
@@ -352,7 +362,7 @@ const fragmentShader = /* glsl */`
     // Missing records: a share of cells holds nothing. Which cells
     // changes in steps, so the gaps flicker rather than crawl.
     float dropShare = 0.58 * pow(smoothstep(0.15, 1.0, sparse), 2.0);
-    float step_     = floor(u_time * 0.55);
+    float step_     = floor(tm * 0.55);
     float hCell     = hash33(vec3(cell, step_)).x;
     float missing   = hCell < dropShare ? 1.0 : 0.0;
     // A thin dark seam between cells once the grid is coarse
@@ -363,12 +373,12 @@ const fragmentShader = /* glsl */`
     float dist   = length(uv);
 
     // Global field rotation (wonder → polarity)
-    float rot  = u_time * 0.0024 + u_polarity * 1.57;
+    float rot  = u_rot + u_polarity * 1.57;
     float cosR = cos(rot), sinR = sin(rot);
     vec2  ruv  = vec2(uv.x*cosR - uv.y*sinR, uv.x*sinR + uv.y*cosR);
 
     // Base coordinate — immersed in field (scale > 1 = features larger than viewport)
-    vec3 p = vec3(ruv * 0.88, u_time * 0.0072);
+    vec3 p = vec3(ruv * 0.88, tm * 0.0072);
 
     // Warp amplitude — fear increases agitation
     float baseWarp = 0.52 + u_turbulence * 0.60;
@@ -376,7 +386,7 @@ const fragmentShader = /* glsl */`
     // The speculative future: the field disperses — features spread
     // and loosen as if the structure can no longer hold
     p.xy *= 1.0 - u_future * 0.45;
-    p.z  += u_future * sin(u_time * 0.21) * 0.35;
+    p.z  += u_future * sin(tm * 0.21) * 0.35;
 
 
     /* ════════════════════════════════════════════════════════════
@@ -387,8 +397,8 @@ const fragmentShader = /* glsl */`
        Gentle warp — blue resists distortion.
        ════════════════════════════════════════════════════════════ */
 
-    float blueBreath = 0.62 + 0.18 * sin(u_time * 0.0128);
-    vec2  cfBlue     = chromaticField(p, u_time * 0.28, blueBreath, blueBreath * 1.55, 0.38);
+    float blueBreath = u_blueBreath;
+    vec2  cfBlue     = chromaticField(p, tm * 0.28, blueBreath, blueBreath * 1.55, 0.38);
     float fBlue      = emissiveGrade(compositeFilament(cfBlue));
 
 
@@ -401,7 +411,7 @@ const fragmentShader = /* glsl */`
 
     vec3 pMag = p + vec3(cfBlue.x * 0.50, cfBlue.x * 0.32, cfBlue.x * 0.21);
     pMag += vec3(6.28, 3.14, 9.42);
-    vec2  cfMag  = chromaticField(pMag, u_time * 0.43, 0.78, 1.32, 0.50);
+    vec2  cfMag  = chromaticField(pMag, tm * 0.43, 0.78, 1.32, 0.50);
     float fMagenta = emissiveGrade(compositeFilament(cfMag));
 
 
@@ -413,9 +423,9 @@ const fragmentShader = /* glsl */`
        ════════════════════════════════════════════════════════════ */
 
     float bloomPull = 0.68 + u_activity * 0.42;
-    vec3  pYel     = p * (1.0 - dist * 0.20 * bloomPull);
+    vec3  pYel     = vec3(p.xy * (1.0 - dist * 0.20 * bloomPull), p.z);   // compress space only, never time (Nov 2026)
     pYel += vec3(2.71, 7.39, 4.67);
-    vec2  cfYel  = chromaticField(pYel, u_time * 0.57, 0.92, 1.58, 0.46 + u_activity * 0.18);
+    vec2  cfYel  = chromaticField(pYel, tm * 0.57, 0.92, 1.58, 0.46 + u_activity * 0.18);
     float fYellow = emissiveGrade(compositeFilament(cfYel)) * (0.70 + u_activity * 0.55);
 
 
@@ -431,7 +441,7 @@ const fragmentShader = /* glsl */`
     float greenWarp = (0.62 - u_turbulence * 0.45) * (0.80 + u_hope * 0.40);
     greenWarp = max(greenWarp, 0.05);
     vec3 pGreen = p + vec3(4.18, 1.95, 6.87);
-    vec2  cfGreen = chromaticField(pGreen, u_time * 0.35, 0.80, 1.40, greenWarp);
+    vec2  cfGreen = chromaticField(pGreen, tm * 0.35, 0.80, 1.40, greenWarp);
     float fGreen  = emissiveGrade(compositeFilament(cfGreen)) * (0.75 + u_hope * 0.40);
 
 
@@ -449,7 +459,7 @@ const fragmentShader = /* glsl */`
 
     float redWarp = 0.48 + u_turbulence * 1.00;
     vec3  pRed   = p + vec3(8.73, 2.41, 5.95);
-    vec2  cfRed  = chromaticField(pRed, u_time * 1.38, 1.08, 1.72, redWarp);
+    vec2  cfRed  = chromaticField(pRed, tm * 1.38, 1.08, 1.72, redWarp);
     float redRaw = compositeFilament(cfRed);
 
     float redExp = mix(3.8, 0.5, u_fear);
@@ -518,9 +528,7 @@ const fragmentShader = /* glsl */`
     /* ── Slow global breath ──────────────────────────────────────
        Two mutually irrational long periods.
        The field breathes rather than stays at fixed brightness. */
-    float breath = 0.88 + 0.12 * sin(u_time * 0.00198);
-    float breath2= 0.96 + 0.04 * sin(u_time * 0.00067);
-    col *= breath * breath2 * u_intensity;
+    col *= u_breath * u_intensity;
 
 
     /* ── Vignette ────────────────────────────────────────────────
@@ -538,7 +546,7 @@ const fragmentShader = /* glsl */`
     if (u_future > 0.001) {
       float lum = dot(col, vec3(0.299, 0.587, 0.114));
       col = mix(col, vec3(lum) * vec3(0.92, 0.95, 1.05), u_future * 0.62);
-      float wt = u_time * 0.4;
+      float wt = tm * 0.4;
       float w0 = hash33(vec3(floor(wt), 3.1, 7.7)).x;
       float w1 = hash33(vec3(floor(wt) + 1.0, 3.1, 7.7)).x;
       float f  = fract(wt);
@@ -563,8 +571,8 @@ const fragmentShader = /* glsl */`
 
     if (u_visitors > 0.001) {
       float tone   = u_visitorTone;
-      vec3  pH     = vec3(uvFine * 0.88, u_time * 0.0072) + vec3(3.33, 9.12, 2.07);
-      vec2  cfH    = chromaticField(pH, u_time * mix(0.18, 0.40, tone),
+      vec3  pH     = vec3(uvFine * 0.88, tm * 0.0072) + vec3(3.33, 9.12, 2.07);
+      vec2  cfH    = chromaticField(pH, tm * mix(0.18, 0.40, tone),
                                     mix(0.70, 0.95, tone), mix(1.25, 1.85, tone), 0.42);
       float fH     = compositeFilament(cfH);
       fH = pow(fH, mix(1.9, 1.2, tone));                    // light days: wider, softer threads
@@ -586,6 +594,18 @@ const fragmentShader = /* glsl */`
     col = col / (col + 0.42);
     col = max(col, vec3(0.004));
 
+    return col;
+  }
+
+  /* ── Main ───────────────────────────────────────────────────
+     Normally one pass. Every half hour, for ten seconds, the field
+     crossfades to an identical field whose clock starts again from
+     zero, so the clock never grows large enough to lose precision
+     on the graphics card (Nov 2026: after a day or two of running
+     the filaments smeared and the yellow field formed rings). */
+  void main() {
+    vec3 col = sceneAt(u_time);
+    if (u_xfade > 0.0005) col = mix(col, sceneAt(u_time2), u_xfade);
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -651,6 +671,11 @@ const consciousnessUniforms = {
    ============================================================ */
 
 let lastTime = null;
+// Long-running safety (Nov 2026): see the note above main() in the shader
+const REBASE_AFTER = Number(new URLSearchParams(location.search).get('rebase')) || 1800;  // seconds
+const REBASE_FADE = 10;
+let rebaseAt = -1;
+let slowClock = 0;
 let densityTarget = 1.0;
 let futureTarget = 0.0;
 let settleTarget = 0.0;
@@ -660,7 +685,23 @@ function animate(ts) {
   if (lastTime === null) lastTime = ts;
   const dt = Math.min(ts - lastTime, 50);
   lastTime = ts;
-  uniforms.u_time.value += dt * 0.001;
+  const dts = dt * 0.001;
+  uniforms.u_time.value += dts;
+  // Slow cycles run on their own clock, in JavaScript's full precision,
+  // so the rotation and breathing never jump when the fast clock rebases
+  slowClock += dts;
+  uniforms.u_rot.value = (slowClock * 0.0024) % (Math.PI * 2);
+  uniforms.u_breath.value = (0.88 + 0.12 * Math.sin(slowClock * 0.00198)) * (0.96 + 0.04 * Math.sin(slowClock * 0.00067));
+  uniforms.u_blueBreath.value = 0.62 + 0.18 * Math.sin(slowClock * 0.0128);
+  // Rebase: every REBASE_AFTER seconds, crossfade to a fresh clock from zero
+  if (rebaseAt < 0 && uniforms.u_time.value > REBASE_AFTER) { rebaseAt = 0; uniforms.u_time2.value = 0; }
+  if (rebaseAt >= 0) {
+    uniforms.u_time2.value += dts;
+    rebaseAt += dts;
+    const k = Math.min(1, rebaseAt / REBASE_FADE);
+    uniforms.u_xfade.value = k * k * (3 - 2 * k);
+    if (k >= 1) { uniforms.u_time.value = uniforms.u_time2.value; uniforms.u_xfade.value = 0; rebaseAt = -1; }
+  }
   // Archive density eases toward its target over a few seconds
   uniforms.u_future.value += (futureTarget - uniforms.u_future.value) * Math.min(1, dt * 0.0012);
   uniforms.u_density.value += (densityTarget - uniforms.u_density.value) * Math.min(1, dt * 0.0012);
